@@ -15,7 +15,7 @@ struct Ray {
     float3 dir;
     float t_max;
 
-    __init(float3 origin, float3 dir, float t_min = 0.f, float t_max = 1000.0)
+    __init(float3 origin, float3 dir, float t_min = 0.f, float t_max = 10000.0)
     {
         this.origin = origin;
         this.dir = dir;
@@ -209,6 +209,7 @@ float3 diffuse_brdf_sample(float3 wi, float2 uv, out float pdf)
 float3 envmap(float3 dir)
 {
     return float3(1);
+
     // float3 env = float3(0);
     // env += saturate(dot(dir, float3(0, 1, 0))) * float3(0.5, 0.5, 1);
     // const float3 LIGHT_DIR = normalize(float3(0.5, 1, -0.8));

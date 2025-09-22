@@ -48,7 +48,7 @@ struct Camera {
     float3 fwd;
     float3 right;
     float3 up{0, 1, 0};
-    float fov{70.0f};
+    float fov{35.0f};
 
     float3 image_u;
     float3 image_v;
@@ -89,7 +89,7 @@ struct CameraController {
     bool shift_down{false};
     float3 move_delta{0.f};
     float2 rotate_delta{0.f};
-    float move_speed{1.0f};
+    float move_speed{50.0f};
     float rotate_speed{0.002f};
 
     static constexpr float MOVE_SHIFT_FACTOR = 10.0f;
@@ -224,12 +224,12 @@ struct Mesh {
             vertex.position *= float3(size.x, 0.f, size.y);
         }
         std::vector<uint32_t> indices{
-            2,
-            1,
             0,
             1,
             2,
+            1,
             3,
+            2,
         };
         return Mesh(vertices, indices);
     }
@@ -333,14 +333,51 @@ struct Stage {
     static std::unique_ptr<Stage> demo()
     {
         std::unique_ptr<Stage> stage = std::make_unique<Stage>();
-        stage->camera.target = float3(0, 1, 0);
-        stage->camera.position = float3(2, 1, 2);
 
-        uint32_t floor_material = stage->add_material(Material(float3(0.5)));
-        uint32_t floor_mesh = stage->add_mesh(Mesh::create_quad(float2(5, 5)));
-        uint32_t floor_transform = stage->add_transform(Transform());
-        stage->add_instance(floor_mesh, floor_material, floor_transform);
+        #if 1
+        stage->camera.target = float3(278.0f, 273.0f, 330.0f);
+        stage->camera.position = float3(278.0f, 273.0f, 900.0f);
+        stage->camera.up = float3(0.0f, 1.0f, 0.0f);
+        #endif
 
+        #if 0
+        stage->camera.target = float3(0.0f);
+        stage->camera.position = float3(0.0f, 1500.0f, 0.0f);
+        stage->camera.up = float3(0.0f, 0.0f, -1.0f);
+        #endif
+
+        #if 1
+        uint32_t white_material = stage->add_material(Material(float3(0.5f)));  // TODO: white
+
+        uint32_t floor_mesh = stage->add_mesh(Mesh::create_quad(float2(550.0f, 550.0f)));
+        {
+            Transform transform;
+            //transform.translation = float3(0.5f*550.0f, 0.0f, 0.5f*550.0f);
+            transform.translation = float3(275.0f, 0.0f, 275.0f);
+            transform.update_matrix();
+            uint32_t floor_transform = stage->add_transform(transform);
+            stage->add_instance(floor_mesh, white_material, floor_transform);
+        }
+        #endif
+
+        #if 1
+        // right wall - green lambert
+        {
+            uint32_t green_material = stage->add_material(Material(float3(0.0f, 1.0f, 0.0f)));
+            uint32_t right_wall_mesh = stage->add_mesh(Mesh::create_quad(float2(550.0f, 550.0f)));
+            Transform transform;
+            transform.rotation = float3(0, 0, math::radians(90.0f));
+            transform.translation = float3(550.0f,  0.5f*550.0f, 0.5f*550.0f);
+            //Transform transform = {.translation = float3(0.5f*550.0f, -0.5f*550.0f, 0.0f), .rotation = float3(0, 0, math::radians(90.0f))};
+
+            transform.update_matrix();
+            uint32_t right_wall_transform = stage->add_transform( transform );
+            stage->add_instance(right_wall_mesh, green_material, right_wall_transform);
+        }
+        #endif
+
+
+#if 0
         std::vector<uint32_t> cube_materials;
         for (uint32_t i = 0; i < 10; ++i)
             cube_materials.push_back(stage->add_material(Material(random_float3())));
@@ -355,6 +392,7 @@ struct Stage {
             uint32_t cube_transform = stage->add_transform(transform);
             stage->add_instance(cube_mesh, cube_materials[i % cube_materials.size()], cube_transform);
         }
+        #endif
 
         return stage;
     }
