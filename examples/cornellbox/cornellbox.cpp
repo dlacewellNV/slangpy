@@ -83,10 +83,12 @@ struct Camera {
 
 struct CameraController {
     Camera& camera;
+    const Camera initial_camera;
     bool mouse_down{false};
     float2 mouse_pos;
     std::map<KeyCode, bool> key_state;
     bool shift_down{false};
+    bool camera_needs_reset{false};
     float3 move_delta{0.f};
     float2 rotate_delta{0.f};
     float move_speed{50.0f};
@@ -103,13 +105,25 @@ struct CameraController {
     };
 
     CameraController(Camera& camera)
-        : camera(camera)
+        : camera(camera), initial_camera(camera)
     {
     }
 
     bool update(float dt)
     {
         bool changed = false;
+        if ( camera_needs_reset ) {
+
+            camera.target = initial_camera.target;
+            camera.position = initial_camera.position;
+            camera.up = initial_camera.up;
+            camera.recompute();
+
+            camera_needs_reset = false;
+            changed = true;
+        }
+
+
         float3 position = camera.position;
         float3 fwd = camera.fwd;
         float3 up = camera.up;
@@ -155,6 +169,8 @@ struct CameraController {
                 key_state[event.key] = down;
             } else if (event.key == KeyCode::left_shift) {
                 shift_down = down;
+            } else if ( event.key == KeyCode::f ) {
+                camera_needs_reset = true;
             }
         }
         move_delta = float3(0.f);
