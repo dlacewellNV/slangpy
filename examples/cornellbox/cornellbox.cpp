@@ -91,7 +91,7 @@ struct CameraController {
     bool camera_needs_reset{false};
     float3 move_delta{0.f};
     float2 rotate_delta{0.f};
-    float move_speed{50.0f};
+    float move_speed{100.0f};
     float rotate_speed{0.002f};
 
     static constexpr float MOVE_SHIFT_FACTOR = 10.0f;
@@ -350,48 +350,72 @@ struct Stage {
     {
         std::unique_ptr<Stage> stage = std::make_unique<Stage>();
 
-        #if 1
         stage->camera.target = float3(278.0f, 273.0f, 330.0f);
         stage->camera.position = float3(278.0f, 273.0f, 900.0f);
         stage->camera.up = float3(0.0f, 1.0f, 0.0f);
-        #endif
 
-        #if 0
-        stage->camera.target = float3(0.0f);
-        stage->camera.position = float3(0.0f, 1500.0f, 0.0f);
-        stage->camera.up = float3(0.0f, 0.0f, -1.0f);
-        #endif
+        uint32_t white_material = stage->add_material(Material(float3(0.5f)));  // TODO: actually white
+        uint32_t green_material = stage->add_material(Material(float3(0.0f, 1.0f, 0.0f)));
+        uint32_t red_material =   stage->add_material(Material(float3(1.0f, 0.0f, 0.0f)));
 
-        #if 1
-        uint32_t white_material = stage->add_material(Material(float3(0.5f)));  // TODO: white
-
+        // floor
         uint32_t floor_mesh = stage->add_mesh(Mesh::create_quad(float2(550.0f, 550.0f)));
+
         {
-            Transform transform;
-            //transform.translation = float3(0.5f*550.0f, 0.0f, 0.5f*550.0f);
-            transform.translation = float3(275.0f, 0.0f, 275.0f);
+            Transform transform {.translation = float3(275.0f, 0.0f, 275.0f)};
             transform.update_matrix();
-            uint32_t floor_transform = stage->add_transform(transform);
-            stage->add_instance(floor_mesh, white_material, floor_transform);
+            stage->add_instance(floor_mesh, white_material, stage->add_transform(transform));
         }
-        #endif
 
-        #if 1
-        // right wall - green lambert
+        // ceiling
         {
-            uint32_t green_material = stage->add_material(Material(float3(0.0f, 1.0f, 0.0f)));
-            uint32_t right_wall_mesh = stage->add_mesh(Mesh::create_quad(float2(550.0f, 550.0f)));
-            Transform transform;
-            transform.rotation = float3(0, 0, math::radians(90.0f));
-            transform.translation = float3(550.0f,  0.5f*550.0f, 0.5f*550.0f);
-            //Transform transform = {.translation = float3(0.5f*550.0f, -0.5f*550.0f, 0.0f), .rotation = float3(0, 0, math::radians(90.0f))};
-
+            Transform transform { .translation = float3(275.0f, 550.0f, 275.0f) };
             transform.update_matrix();
-            uint32_t right_wall_transform = stage->add_transform( transform );
-            stage->add_instance(right_wall_mesh, green_material, right_wall_transform);
+            stage->add_instance(floor_mesh, white_material, stage->add_transform(transform));
         }
-        #endif
 
+        // back wall
+        {
+            Transform transform {
+                .translation = float3(275.0f,  0.5f*550.0f, 0.0f),
+                .rotation = float3(math::radians(90.0f), 0.0f, 0.0f),
+            };
+            transform.update_matrix();
+            stage->add_instance(floor_mesh, white_material, stage->add_transform(transform));
+        }
+
+        // right wall
+        {
+            Transform transform {
+                .translation = float3(550.0f,  0.5f*550.0f, 0.5f*550.0f),
+                .rotation = float3(0, 0, math::radians(90.0f)),
+            };
+            transform.update_matrix();
+            stage->add_instance(floor_mesh, green_material, stage->add_transform(transform));
+        }
+
+        // right wall
+        {
+            Transform transform {
+                .translation = float3(0.0f,  0.5f*550.0f, 0.5f*550.0f),
+                .rotation = float3(0, 0, -math::radians(90.0f)),
+            };
+            transform.update_matrix();
+            stage->add_instance(floor_mesh, red_material, stage->add_transform(transform));
+        }
+
+        // short block - placed by eye
+        uint32_t cube_mesh = stage->add_mesh(Mesh::create_cube(float3(1.0f)));
+        {
+            Transform transform {
+                .translation = float3(275.0f,  5.0f, 275.0f),
+                .scaling = float3(100.0f, 200.0f, 100.0f),
+                .rotation = float3(0, math::radians(30.0f), 0),
+            };
+            transform.update_matrix();
+            stage->add_instance(cube_mesh, white_material, stage->add_transform(transform));
+
+        }
 
 #if 0
         std::vector<uint32_t> cube_materials;
