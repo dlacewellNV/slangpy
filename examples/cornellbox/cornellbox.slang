@@ -227,6 +227,7 @@ uniform uint g_frame;
 void rt_miss(inout Path path)
 {
     path.L += path.thp * envmap(path.ray.dir);
+    path.vertex_index = 900; // stop traversing
 }
 
 [shader("closesthit")]
@@ -254,6 +255,7 @@ void rt_closest_hit(inout Path path, BuiltInTriangleIntersectionAttributes attri
     //path.ray = Ray(vertex.position + vertex.normal * 1e-6f, frame.to_global(wo));
     path.ray = Ray(vertex.position + vertex.normal * 0.01f, frame.to_global(wo));
 
+    #if 0
     if (path.vertex_index >= 5) {
         return;
     }
@@ -267,6 +269,7 @@ void rt_closest_hit(inout Path path, BuiltInTriangleIntersectionAttributes attri
         path.ray.to_ray_desc(),
         path
     );
+    #endif
 }
 
 [shader("raygeneration")]
@@ -286,16 +289,18 @@ void rt_ray_gen()
         uv.y = 1 - uv.y;
         Ray ray = g_scene.camera.get_ray(uv);
         Path path = Path(pixel, ray, rng);
-        TraceRay(
-            g_scene.tlas,
-            0,
-            0xff,
-            0 /* RayContributionToHitGroupIndex */,
-            0 /* MultiplierForGeometryContributionHitGroupIndex */,
-            0 /* MissShaderIndex */,
-            path.ray.to_ray_desc(),
-            path
-        );
+        while (path.vertex_index < 5) {
+            TraceRay(
+                g_scene.tlas,
+                0,
+                0xff,
+                0 /* RayContributionToHitGroupIndex */,
+                0 /* MultiplierForGeometryContributionHitGroupIndex */,
+                0 /* MissShaderIndex */,
+                path.ray.to_ray_desc(),
+                path
+            );
+        }
         L += path.L;
     }
     L /= spp;
