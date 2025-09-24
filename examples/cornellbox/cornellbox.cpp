@@ -413,35 +413,32 @@ struct Stage {
             stage->add_instance(floor_mesh, red_material, stage->add_transform(transform));
         }
 
-        // short block - placed by eye
+        // Note: transforms on the blocks do not exactly match the original Cornell Box scene
+
+        // short block
         uint32_t cube_mesh = stage->add_mesh(Mesh::create_cube(float3(1.0f)));
         {
             Transform transform {
-                .translation = float3(275.0f,  100.0f, 275.0f),
-                .scaling = float3(100.0f, 200.0f, 100.0f),
-                .rotation = float3(0, math::radians(30.0f), 0),
+                .translation = float3(364.0f,  0.5*165.0f, 381.0f),
+                .scaling = float3(165.0f),
+                .rotation = float3(0, math::radians(-17.0f), 0),
             };
             transform.update_matrix();
             stage->add_instance(cube_mesh, white_material, stage->add_transform(transform));
 
         }
 
-#if 0
-        std::vector<uint32_t> cube_materials;
-        for (uint32_t i = 0; i < 10; ++i)
-            cube_materials.push_back(stage->add_material(Material(random_float3())));
-        uint32_t cube_mesh = stage->add_mesh(Mesh::create_cube(float3(0.1)));
-        for (uint32_t i = 0; i < 1000; ++i) {
-            Transform transform;
-            transform.translation = random_float3() * 2.f - 1.f;
-            transform.translation.y += 1;
-            transform.scaling = random_float3() + 0.5f;
-            transform.rotation = random_float3() * 10.f;
+        // tall block
+        {
+            Transform transform {
+                .translation = float3(182.0f,  0.5*330.0f, 199.0f),
+                .scaling = float3(174.0f, 330.0f, 174.0f),
+                .rotation = float3(0, math::radians(17.0f), 0),
+            };
             transform.update_matrix();
-            uint32_t cube_transform = stage->add_transform(transform);
-            stage->add_instance(cube_mesh, cube_materials[i % cube_materials.size()], cube_transform);
+            stage->add_instance(cube_mesh, white_material, stage->add_transform(transform));
+
         }
-        #endif
 
         return stage;
     }
