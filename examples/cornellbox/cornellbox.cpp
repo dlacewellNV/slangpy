@@ -240,12 +240,7 @@ struct Mesh {
             vertex.position *= float3(size.x, 0.f, size.y);
         }
         std::vector<uint32_t> indices{
-            0,
-            1,
-            2,
-            1,
-            3,
-            2,
+            0, 1, 2,  1, 3, 2
         };
         return Mesh(vertices, indices);
     }
@@ -291,7 +286,7 @@ struct Mesh {
         std::vector<uint32_t> indices{
             // The indices follow a (v0, v1, v2) and (v0, v2, v3) pattern
             // to create two CCW triangles for each quad (v0, v1, v2, v3).
-            
+
             // bottom
             0, 1, 2,   0, 2, 3,
             // top
@@ -422,9 +417,9 @@ struct Stage {
         uint32_t cube_mesh = stage->add_mesh(Mesh::create_cube(float3(1.0f)));
         {
             Transform transform {
-                .translation = float3(275.0f,  5.0f, 275.0f),
+                .translation = float3(275.0f,  100.0f, 275.0f),
                 .scaling = float3(100.0f, 200.0f, 100.0f),
-                //.rotation = float3(0, math::radians(30.0f), 0),
+                .rotation = float3(0, math::radians(30.0f), 0),
             };
             transform.update_matrix();
             stage->add_instance(cube_mesh, white_material, stage->add_transform(transform));

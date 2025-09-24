@@ -249,8 +249,11 @@ void rt_closest_hit(inout Path path, BuiltInTriangleIntersectionAttributes attri
     MaterialDesc material = g_scene.get_material(hit);
     float3 f = material.base_color * INV_PI;
     path.thp *= f * abs(dot(wo, frame.n)) / pdf;
+
     path.vertex_index++;
-    path.ray = Ray(vertex.position + vertex.normal * 1e-6f, frame.to_global(wo));
+    //path.ray = Ray(vertex.position + vertex.normal * 1e-6f, frame.to_global(wo));
+    path.ray = Ray(vertex.position + vertex.normal * 0.01f, frame.to_global(wo));
+
     if (path.vertex_index >= 5) {
         return;
     }
