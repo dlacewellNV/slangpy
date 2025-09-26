@@ -850,6 +850,7 @@ struct App {
                 .defines = {
                     {"USE_RAYTRACING_PIPELINE", USE_RAYTRACING_PIPELINE ? "1" : "0"},
                 },
+                //.debug_info = sgl::SlangDebugInfoLevel::standard
             },
         });
         surface = device->create_surface(window);
