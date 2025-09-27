@@ -321,6 +321,7 @@ struct Transform {
     }
 };
 
+
 struct Light {
     float3 corner;
     float3 v1;
@@ -471,7 +472,7 @@ struct Stage {
             };
             stage->add_light(light);
             uint32_t mesh_id = stage->add_mesh(mesh);
-            uint32_t light_material =   stage->add_material(Material(float3(15.0f, 15.0f, 5.0f), true));
+            uint32_t light_material = stage->add_material(Material(float3(15.0f, 15.0f, 5.0f), true));
             stage->add_instance(mesh_id, light_material, stage->add_transform(transform));
 
         }
@@ -636,6 +637,8 @@ struct Scene {
             .data = stage.lights.data(),
             .data_size = stage.lights.size() * sizeof(Light),
         });
+
+        sgl::log_info("stage.lights.size() = {}, sizeof(Light) = {}", stage.lights.size(), sizeof(Light));
 
         // Build BLASes
         for (const MeshDesc& mesh_desc : mesh_descs)

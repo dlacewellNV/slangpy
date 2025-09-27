@@ -236,7 +236,7 @@ uniform uint g_frame;
 [shader("miss")]
 void rt_miss(inout Path path)
 {
-    path.L += path.thp * envmap(path.ray.dir);
+   //path.L += path.thp * envmap(path.ray.dir);
     path.vertex_index = 900; // stop traversing
 }
 
@@ -268,18 +268,27 @@ void rt_closest_hit(inout Path path, BuiltInTriangleIntersectionAttributes attri
             path.L = 0.0f;
         }
         path.vertex_index = 900; // stop traversing
-    } else {
-        path.thp *= f * abs(dot(wo, frame.n)) / pdf;
+        return;
     }
 
-    //assert(g_scene.lights.size() > 0);
-    //Light light = g_scene.lights[0];
+    // Note: calling lights.size() causes a runtime error for some reason
+    // assert(g_scene.lights.size() > 0);
 
-    // TODO: pick random sample point on the light, shoot a shadow ray, and add its contribution to the path
+    Light light = g_scene.lights[0];
 
+    // pick random sample point on the light, shoot a shadow ray, and add its contribution to the path
+    float2 light_uv = path.rng.next_2d();
+    float3 light_pos = light.corner + light.v1 * light_uv.x + light.v2 * light_uv.y;
+    float Ldist = length(light_pos - vertex.position);
+    float3 L = normalize(light_pos - vertex.position);
+    float NdotL = max(0.0f, dot(vertex.normal, L));
+    float LNdotL = max(0.0f, -dot(light.normal, L));
+    float A = length(cross(light.v1, light.v2));
 
+    path.L += path.thp * f * NdotL * light.emission * LNdotL * A / (Ldist * Ldist);
 
     path.vertex_index++;
+    path.thp *= f * abs(dot(wo, frame.n)) / pdf;
     path.ray = Ray(vertex.position + vertex.normal * 0.01f, frame.to_global(wo));
 
 }
