@@ -276,7 +276,7 @@ void rt_closest_hit(inout Path path, BuiltInTriangleIntersectionAttributes attri
 
     Light light = g_scene.lights[0];
 
-    // pick random sample point on the light, shoot a shadow ray, and add its contribution to the path
+    // pick random sample point on the light
     float2 light_uv = path.rng.next_2d();
     float3 light_pos = light.corner + light.v1 * light_uv.x + light.v2 * light_uv.y;
     float Ldist = length(light_pos - vertex.position);
@@ -285,7 +285,17 @@ void rt_closest_hit(inout Path path, BuiltInTriangleIntersectionAttributes attri
     float LNdotL = max(0.0f, -dot(light.normal, L));
     float A = length(cross(light.v1, light.v2));
 
-    path.L += path.thp * f * NdotL * light.emission * LNdotL * A / (Ldist * Ldist);
+    // shoot a shadow ray to the light.  not sure how to set up a HitObject for this.
+    Path sp;
+    sp.vertex_index = 0;
+    Ray shadow_ray = Ray(vertex.position, L, 0.01f, Ldist - 0.01f);
+    TraceRay( g_scene.tlas,
+        RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
+        0xff, 0, 0, 0, shadow_ray.to_ray_desc(), sp);
+
+    if (sp.vertex_index == 900) {  // missed
+        path.L += path.thp * f * NdotL * light.emission * LNdotL * A / (Ldist * Ldist);
+    }
 
     path.vertex_index++;
     path.thp *= f * abs(dot(wo, frame.n)) / pdf;
