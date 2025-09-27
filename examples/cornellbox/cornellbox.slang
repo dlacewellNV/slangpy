@@ -100,8 +100,17 @@ struct Camera {
     }
 };
 
+struct Light {
+    float3 corner;
+    float3 v1;
+    float3 v2;
+    float3 normal;
+    float3 emission;
+};
+
 struct MaterialDesc {
     float3 base_color;
+    bool emissive;  // hack - this material is a light proxy
 };
 
 struct Vertex {
@@ -133,6 +142,7 @@ struct Scene {
     StructuredBuffer<uint> indices;
     StructuredBuffer<float4x4> transforms;
     StructuredBuffer<float4x4> inverse_transpose_transforms;
+    StructuredBuffer<Light> lights;
 
     Camera camera;
 
@@ -249,27 +259,22 @@ void rt_closest_hit(inout Path path, BuiltInTriangleIntersectionAttributes attri
     float3 wo = diffuse_brdf_sample(wi, path.rng.next_2d(), pdf);
     MaterialDesc material = g_scene.get_material(hit);
     float3 f = material.base_color * INV_PI;
-    path.thp *= f * abs(dot(wo, frame.n)) / pdf;
+
+    // hack for "emissive" materials, which are really just light proxy objects for now
+    if (material.emissive) {
+        if (path.vertex_index == 0) {
+            path.L = f * abs(dot(wo, frame.n)) / pdf;
+        } else {
+            path.L = 0.0f;
+        }
+        path.vertex_index = 900; // stop traversing
+    } else {
+        path.thp *= f * abs(dot(wo, frame.n)) / pdf;
+    }
 
     path.vertex_index++;
-    //path.ray = Ray(vertex.position + vertex.normal * 1e-6f, frame.to_global(wo));
     path.ray = Ray(vertex.position + vertex.normal * 0.01f, frame.to_global(wo));
 
-    #if 0
-    if (path.vertex_index >= 5) {
-        return;
-    }
-    TraceRay(
-        g_scene.tlas,
-        0,
-        0xff,
-        0 /* RayContributionToHitGroupIndex */,
-        0 /* MultiplierForGeometryContributionHitGroupIndex */,
-        0 /* MissShaderIndex */,
-        path.ray.to_ray_desc(),
-        path
-    );
-    #endif
 }
 
 [shader("raygeneration")]

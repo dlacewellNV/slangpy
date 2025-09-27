@@ -202,9 +202,10 @@ struct CameraController {
 
 struct Material {
     float3 base_color;
+    bool emissive;
 
-    Material(float3 base_color = float3(0.5))
-        : base_color(base_color)
+    Material(float3 base_color = float3(0.5), bool emissive = false)
+        : base_color(base_color), emissive(emissive)
     {
     }
 };
@@ -320,12 +321,21 @@ struct Transform {
     }
 };
 
+struct Light {
+    float3 corner;
+    float3 v1;
+    float3 v2;
+    float3 normal;
+    float3 emission;
+};
+
 struct Stage {
     Camera camera;
     std::vector<Material> materials;
     std::vector<Mesh> meshes;
     std::vector<Transform> transforms;
     std::vector<std::tuple<uint32_t, uint32_t, uint32_t>> instances;
+    std::vector<Light> lights;
 
     uint32_t add_material(const Material& material)
     {
@@ -355,17 +365,24 @@ struct Stage {
         return instance_id;
     }
 
+    uint32_t add_light(const Light& light)
+    {
+        uint32_t light_id = uint32_t(lights.size());
+        lights.push_back(light);
+        return light_id;
+    }
+
     static std::unique_ptr<Stage> demo()
     {
         std::unique_ptr<Stage> stage = std::make_unique<Stage>();
 
         stage->camera.target = float3(278.0f, 273.0f, 330.0f);
-        stage->camera.position = float3(278.0f, 273.0f, 900.0f);
+        stage->camera.position = float3(278.0f, 273.0f, 1500.0f);
         stage->camera.up = float3(0.0f, 1.0f, 0.0f);
 
-        uint32_t white_material = stage->add_material(Material(float3(0.5f)));  // TODO: actually white
-        uint32_t green_material = stage->add_material(Material(float3(0.0f, 1.0f, 0.0f)));
-        uint32_t red_material =   stage->add_material(Material(float3(1.0f, 0.0f, 0.0f)));
+        uint32_t white_material = stage->add_material(Material(float3(0.8f)));
+        uint32_t green_material = stage->add_material(Material(float3(0.0f, 0.8f, 0.0f)));
+        uint32_t red_material =   stage->add_material(Material(float3(0.8f, 0.0f, 0.0f)));
 
         // floor
         uint32_t floor_mesh = stage->add_mesh(Mesh::create_quad(float2(550.0f, 550.0f)));
@@ -437,6 +454,25 @@ struct Stage {
             };
             transform.update_matrix();
             stage->add_instance(cube_mesh, white_material, stage->add_transform(transform));
+        }
+
+        // light, and proxy geometry
+        {
+            Transform transform { .translation = float3(275.0f, 548.0f, 275.0f) };
+            Mesh mesh = Mesh::create_quad(float2(130.0f, 105.0f));
+
+            transform.update_matrix();
+            Light light {
+                .corner = sgl::math::transform_point(transform.matrix, mesh.vertices[0].position),
+                .v1 = float3(130.0f, 0.0f, 0.0f),
+                .v2 = float3(0.0f, 0.0f, 105.0f),
+                .normal = float3(0.0f, -1.0f, 0.0f),
+                .emission = float3(15.0f)
+            };
+            stage->add_light(light);
+            uint32_t mesh_id = stage->add_mesh(mesh);
+            uint32_t light_material =   stage->add_material(Material(float3(15.0f, 15.0f, 5.0f), true));
+            stage->add_instance(mesh_id, light_material, stage->add_transform(transform));
 
         }
 
@@ -447,6 +483,7 @@ struct Stage {
 struct Scene {
     struct MaterialDesc {
         float3 base_color;
+        bool emissive;
     };
 
     struct MeshDesc {
@@ -489,8 +526,10 @@ struct Scene {
     {
         // Prepare material descriptors
         material_descs.resize(stage.materials.size());
-        for (size_t i = 0; i < stage.materials.size(); ++i)
+        for (size_t i = 0; i < stage.materials.size(); ++i) {
             material_descs[i].base_color = stage.materials[i].base_color;
+            material_descs[i].emissive = stage.materials[i].emissive;
+        }
 
         material_descs_buffer = device->create_buffer({
             .usage = BufferUsage::shader_resource,
