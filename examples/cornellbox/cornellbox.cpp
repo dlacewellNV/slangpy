@@ -515,6 +515,7 @@ struct Scene {
     std::vector<float4x4> inverse_transpose_transforms;
     ref<Buffer> transforms_buffer;
     ref<Buffer> inverse_transpose_transforms_buffer;
+    ref<Buffer> lights_buffer;
     ref<Buffer> identity_buffer;
     std::vector<ref<AccelerationStructure>> blases;
     ref<AccelerationStructure> tlas;
@@ -629,6 +630,13 @@ struct Scene {
             .data_size = sizeof(identity),
         });
 
+        lights_buffer = device->create_buffer({
+            .usage = BufferUsage::shader_resource,
+            .label = "lights_buffer",
+            .data = stage.lights.data(),
+            .data_size = stage.lights.size() * sizeof(Light),
+        });
+
         // Build BLASes
         for (const MeshDesc& mesh_desc : mesh_descs)
             blases.push_back(build_blas(mesh_desc));
@@ -728,6 +736,7 @@ struct Scene {
         cursor["indices"] = index_buffer;
         cursor["transforms"] = transforms_buffer;
         cursor["inverse_transpose_transforms"] = inverse_transpose_transforms_buffer;
+        cursor["lights"] = lights_buffer;
         camera.bind(cursor["camera"]);
     }
 };

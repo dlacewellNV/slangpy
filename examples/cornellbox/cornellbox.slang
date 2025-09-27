@@ -272,6 +272,13 @@ void rt_closest_hit(inout Path path, BuiltInTriangleIntersectionAttributes attri
         path.thp *= f * abs(dot(wo, frame.n)) / pdf;
     }
 
+    //assert(g_scene.lights.size() > 0);
+    //Light light = g_scene.lights[0];
+
+    // TODO: pick random sample point on the light, shoot a shadow ray, and add its contribution to the path
+
+
+
     path.vertex_index++;
     path.ray = Ray(vertex.position + vertex.normal * 0.01f, frame.to_global(wo));
 
