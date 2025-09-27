@@ -757,7 +757,12 @@ struct PathTracer {
         , scene(scene)
     {
         if (USE_RAYTRACING_PIPELINE) {
-            program = device->load_program("cornellbox.slang", {"rt_ray_gen", "rt_closest_hit", "rt_miss"});
+            try {
+                program = device->load_program("cornellbox.slang", {"rt_ray_gen", "rt_closest_hit", "rt_miss"});
+            } catch (const std::exception& e) {
+                sgl::log_error("Shader compile failed:\n{}", e.what());
+                throw;
+            }
             rt_pipeline = device->create_ray_tracing_pipeline({
                 .program = program,
                 .hit_groups = {
@@ -893,15 +898,28 @@ struct App {
             .title = "PathTracer",
             .resizable = true,
         });
+
+        // suggested by chatgpt
+        sgl::Logger::get().set_level(sgl::LogLevel::debug);
+        sgl::Logger::get().remove_all_outputs();
+        sgl::Logger::get().add_console_output();          // stdout/stderr
+        sgl::Logger::get().add_debug_console_output();    // VS Output window
+        sgl::Logger::get().add_file_output("slang.log");  // persistent log file
+        sgl::set_exception_diagnostics(sgl::ExceptionDiagnosticFlags::log);
+
         device = Device::create({
-            // .type = DeviceType::cuda,
+            //.type = DeviceType::cuda,
+            //.type = DeviceType::vulkan,
             .enable_debug_layers = true,
+            .enable_compilation_reports = true,
             .compiler_options = {
                 .include_paths = {EXAMPLE_DIR},
                 .defines = {
                     {"USE_RAYTRACING_PIPELINE", USE_RAYTRACING_PIPELINE ? "1" : "0"},
                 },
-                //.debug_info = sgl::SlangDebugInfoLevel::standard
+                //.debug_info = sgl::SlangDebugInfoLevel::standard,
+                //.dump_intermediates = true,
+                //.dump_intermediates_prefix = "slang_dump"
             },
         });
         surface = device->create_surface(window);
