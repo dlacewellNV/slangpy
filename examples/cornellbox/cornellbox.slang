@@ -285,15 +285,14 @@ void rt_closest_hit(inout Path path, BuiltInTriangleIntersectionAttributes attri
     float LNdotL = max(0.0f, -dot(light.normal, L));
     float A = length(cross(light.v1, light.v2));
 
-    // shoot a shadow ray to the light.  not sure how to set up a HitObject for this.
+    // Shoot a shadow ray to the light, without shading it
     Path sp;
     sp.vertex_index = 0;
     Ray shadow_ray = Ray(vertex.position, L, 0.01f, Ldist - 0.01f);
-    TraceRay( g_scene.tlas,
-        RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
-        0xff, 0, 0, 0, shadow_ray.to_ray_desc(), sp);
+    HitObject hitobj = HitObject.TraceRay( g_scene.tlas, RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
+        0xff, 0, 0, 0, shadow_ray.to_ray_desc(), sp );
 
-    if (sp.vertex_index == 900) {  // missed
+    if (hitobj.IsMiss()) {
         path.L += path.thp * f * NdotL * light.emission * LNdotL * A / (Ldist * Ldist);
     }
 

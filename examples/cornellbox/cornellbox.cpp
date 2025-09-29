@@ -904,12 +904,12 @@ struct App {
         sgl::Logger::get().remove_all_outputs();
         sgl::Logger::get().add_console_output();          // stdout/stderr
         sgl::Logger::get().add_debug_console_output();    // VS Output window
-        sgl::Logger::get().add_file_output("slang.log");  // persistent log file
+        //sgl::Logger::get().add_file_output("slang.log");  // persistent log file
         sgl::set_exception_diagnostics(sgl::ExceptionDiagnosticFlags::log);
 
         device = Device::create({
             //.type = DeviceType::cuda,
-            //.type = DeviceType::vulkan,
+            .type = DeviceType::vulkan,
             .enable_debug_layers = true,
             .enable_compilation_reports = true,
             .compiler_options = {
