@@ -1,25 +1,23 @@
 ### Cluster Acceleration Structure – Working Plan
 
 ## High-level outline
-- Goal: Add portable cluster acceleration structure support to `slang-rhi` and `sgl`, OptiX backend first. Keep OMM orthogonal. No device-side copies for indirect args.
+- Goal: Add portable cluster acceleration structure support to `slang-rhi` and `sgl`, OptiX backend first. No device-side copies for indirect args.
 - Feature gates:
   - Core clusters and templates: “cluster-acceleration-structure” (in the existing ray tracing section)
-  - OMM: not exposed in MVP; reserved for future extension
 - MVP scope:
-  - Build types: ClustersFromTriangles, GasesFromClusters
+  - Build types: CLASFromTriangles, BLASFromCLAS
   - Include unstructured TemplatesFromTriangles and ClustersFromTemplates in headers now (core feature), implement in a follow-up local stage
   - Exclude structured grid clusters (OptiX-only) from common API for now
 
-## CRITICAL: Device-args ABI (zero‑copy)
-- Device-facing `*Args` structs are ABI objects, not high-level descriptors.
-  - MUST be fixed-stride, trivially copyable PODs with explicit alignment.
-  - MUST bitwise-match the backend driver ABI and be suitable for direct DMA to the driver.
-  - Live in device buffers and are passed through backends without per-field translation.
-- Cross-backend bit-level compatibility:
-  - `ClusterTrianglesArgs` must match OptiX `OptixClusterAccelBuildInputTrianglesArgs` and the Vulkan/DX cluster-accel equivalents.
-  - `ClusterTemplatesArgs` and `ClustersArgs` follow the same rule: field sizes/order/padding must match the driver ABI.
-  - Reserve OMM-related slots; OMM is not exposed in MVP and those fields must be zero.
-  - Unknown `next` nodes return UnsupportedExtension.
+## CRITICAL: device-args ABI (zero‑copy)
+- ABI objects in device buffers; backends forward them without per-field translation.
+- Fixed-stride, trivially copyable PODs with explicit alignment/padding; only scalars and 64‑bit device addresses.
+- Single cross-backend definition (OptiX/Vulkan/DX share the same layout). Match the driver ABI bitwise.
+- No C/C++ bitfields. Use packed integers (`u32`/`u64`) with SHIFT/MASK helpers (host/device share the same constants).
+- Headers: one device-only header (`cluster_accel_abi.slang`) defines structs + pack/unpack. Host treats buffers as opaque. Optional tiny host mirror for tests/tools only.
+- OMM-related fields present in vendor ABIs must be zero in MVP.
+- Host-side Desc `next`: allowed on host Desc only; in MVP must be null; unknown → UnsupportedExtension. Device-args never include `next`.
+- Kernels write args; insert a UAV/global barrier before the build that consumes them; ensure buffer visibility for the backend.
 
 ## Session checklist (tick as you go)
 - [ ] Step 1: RHI headers — compile-only
@@ -29,9 +27,13 @@
 - [ ] Step 3: Feature wiring — defaults off
   - Acceptance: feature registered in RHI and mirrored in sgl; defaults off
 - [ ] Step 4: OptiX backend — clusters MVP
-  - Acceptance: sizes/build for triangles→clusters and clusters→GAS work on OptiX
+  - Acceptance: sizes/build for triangles→clusters and clusters→BLAS work on OptiX
+  - Add a minimal OptiX-only smoke test: one `*Args` record in a device buffer → build → verify non‑zero output handle(s)/sizes; log basic stats
+  - Use `reference/optix-cluster-example/` as guidance for field packing and expected build behavior
 - [ ] Step 5: sgl conversion + smoke test
   - Acceptance: guarded example path runs; feature‑check gates code path
+  - Example: triangles → clusters → BLAS, behind `device->has_feature("cluster-acceleration-structure")`; print handle count/size
+  - Location: `examples/clusters/simple_unstructured` (or extend an existing raytracing example)
 - [ ] Step 6: Templates (unstructured)
   - Acceptance: templates build path works on OptiX; outputs are device addresses (no object types)
   
@@ -40,7 +42,7 @@
 - A reference copy of OptiX headers such as optix_host.h can be found in reference/optix-include/
 - for Vulkan: reference/vk-extension
 - for DX: reference/nvapi
-- These are our three backends; the RHI surface for clusters must remain cross‑compatible. When terminology or behavior is ambiguous, prefer OptiX naming and conventions while preserving Vulkan/DX compatibility.
+- These are our three backends; the RHI surface for clusters must remain cross‑compatible. When terminology or behavior is ambiguous, stop and ask
  - OptiX cluster sample: reference/optix-cluster-example/ (host/device flow for unstructured clusters)
 
 ## Agent quickstart (starting mid-stream)
@@ -51,123 +53,27 @@
   - Headers/API: `external/slang-rhi/include/slang-rhi.h`
   - RHI stubs/defaults: `external/slang-rhi/src/device.h/.cpp`, `external/slang-rhi/src/command-buffer.h/.cpp`, `external/slang-rhi/src/debug-layer/*`
   - sgl mirrors/wrappers: `src/sgl/device/*.h/.cpp`, `src/sgl/device/types.h`, `src/sgl/device/command.h/.cpp`
-- Implementation rules (MVP):
+ - Implementation rules (MVP):
   - Feature: only `"cluster-acceleration-structure"` is exposed and defaults off.
   - OMM: not exposed; all OMM fields must be zero/null.
-  - Unknown `next` nodes return UnsupportedExtension.
   - Backends other than OptiX: return NotImplemented/NotAvailable.
 - Done criteria per session:
   - Code compiles; new symbols link.
   - Acceptance bullets for the chosen step are satisfied.
   - Do not pre-implement later steps; keep changes scoped.
 
-## Future work pointers
-- OMM extension: see "OMM (future)"; not part of MVP; fields remain zero.
-- Other backends and polish: see "Backend behavior"; initially return NotImplemented.
-- Structured grids/templates: excluded from common API; consider as OptiX-only extension via `next`.
-
-## Bite-sized task list
-- Step 1: RHI headers (compile-only)
-  - Goal: add cluster build API to headers; no backend impls yet
-  - Files: `external/slang-rhi/include/slang-rhi.h`, `external/slang-rhi/src/device.h/.cpp`, `external/slang-rhi/src/command-buffer.h/.cpp`, `external/slang-rhi/src/debug-layer/*`
-  - Work (concise): declare build enums, device-args PODs, mode descriptors, `ClusterAccelBuildDesc`, `getClusterAccelerationSizes`, and `buildClusterAcceleration` entry points only
-  - Invariants (critical): device-args are zero-copy ABI objects (fixed-stride, POD, aligned), bitwise-matching backend headers; unknown `next` → UnsupportedExtension; defaults return NotAvailable
-  - Acceptance: headers compile; device/encoder stubs link; `hasFeature("cluster-acceleration-structure")` recognized
-- Step 2: sgl headers (compile-only)
-  - Goal: mirror RHI types; wrappers + converter; no runtime work
-  - Files: `src/sgl/device/raytracing.h/.cpp` (or `device/cluster.h/.cpp`), `src/sgl/device/command.h/.cpp`, `src/sgl/device/types.h`
-  - Work: mirror enums/structs with `SGL_ENUM_*`; add `ClusterAccelBuildDescConverter` (handles `next`); add `CommandEncoder::build_cluster_acceleration(...)`
-  - Invariants: gate public entry points on `device->has_feature("cluster-acceleration-structure")` where applicable
-  - Acceptance: sgl compiles; converter builds; encoder exposes the method
-- Step 3: Feature wiring (defaults off)
-  - Register feature in RHI: add `ClusterAccelerationStructure` ("cluster-acceleration-structure") to `SLANG_RHI_FEATURES`
-  - Mirror in sgl `Feature`; ensure `Device::has_feature()` resolves name
-  - All new calls return NotAvailable/NotImplemented until backend lands
-- Step 4: OptiX backend — Clusters MVP
-  - Enable feature when device reports cluster support
-  - Implement sizes/build for ClustersFromTriangles and GasesFromClusters
-  - Define fixed device-args ABI; zero OMM slots
-- Step 5: sgl conversion + smoke test
-  - Wire converters; add minimal example path guarded by feature check
-- Step 6: Templates (unstructured)
-  - Implement TemplatesFromTriangles and ClustersFromTemplates in OptiX
-  - No template object type; templates are device-memory outputs identified by addresses
-  - Templates capture topology/grouping and materialization parameters only; they do not carry vertex positions or index buffers
-  - Define a fixed device-args ABI for templates
-- Step 7: Other backends + polish
-  - Vulkan/DX return NotImplemented initially; add support later
-  - Validation, examples, docs, basic tests
-
-<!-- Steps are sequential; complete earlier steps first. -->
 
 ## Additional details
 
 ### RHI API (additions)
-- Build types: triangles→clusters, templates→clusters, clusters→GAS (plus templates-from-triangles/grids)
+- Build types: triangles→CLAS, templates→CLAS, CLAS→BLAS (plus templates-from-triangles/grids)
 - Modes: implicit (pool + handles), explicit (dest addresses, optional echoed handles), get-sizes
-- Device-args: fixed-stride, aligned PODs; `PrimitiveInfo` + optional per-primitive device array; all have `next` (must be null in MVP)
 - Methods: `getClusterAccelerationSizes`, `buildClusterAcceleration`
-- Outputs: device addresses only (no object types); GAS consumes addresses from handles/dest arrays
+- Outputs: device addresses only (no object types); BLAS consumes addresses from handles/dest arrays
 
 ### sgl layer
-- Mirror enums/structs with `SGL_ENUM_*`
-- `ClusterAccelBuildDescConverter` builds `rhi::ClusterAccelBuildDesc`, handles `next`
-- Command wrapper `build_cluster_acceleration(const ClusterAccelBuildDesc&)`
-- Feature checks:
-  - Require “cluster-acceleration-structure” for clusters/templates
- - Consumption pattern:
-   - For ImplicitDestinations, allocate an output pool buffer and an `output_handles` buffer; GAS‑from‑clusters consumes the device addresses from `output_handles`.
-   - For ExplicitDestinations, upload an array of per‑cluster destination device addresses; GAS‑from‑clusters may consume either this array or an optional echoed `output_handles` buffer.
+- Mirror enums/structs with `SGL_ENUM_*`; add `build_cluster_acceleration(const ClusterAccelBuildDesc&)` wrapper.
+- Feature-gate public API on `device->has_feature("cluster-acceleration-structure")`.
 
-### Abstractions: Cluster outputs (device addresses)
-- There is no `IClusterAccelerationStructure` object. A “CLAS” is a device‑resident blob whose device address identifies a built cluster.
-- Creation model: applications allocate storage based on `getClusterAccelerationSizes`. `buildClusterAcceleration` populates storage:
-  - ImplicitDestinations: packs many clusters into a single output pool; writes per‑cluster device addresses to an `outputHandles` array.
-  - ExplicitDestinations: writes each cluster to an application‑provided device address; may optionally echo per‑cluster device addresses to an `outputHandles` array.
-- Backend mapping: backends store their native compacted cluster records and metadata. The RHI surface exposes only device addresses for portability.
-
-### OMM (future)
-- Not exposed in MVP. If added later, model as an extension node via `next`.
-- OptiX mapping: set `allowOpacityMicromaps = 1` and map fields.
-- Until then, all OMM-related fields must be zero/null.
-
-
-### Step acceptance (MVP path)
-- Step 1: compiles/links, feature names resolvable, default stubs return NotAvailable
-- Step 2: compiles, converter exists, encoder API present (no backend calls)
-- Step 3: features registered and mirrored; default feature state is off on all backends
-
-### Backend behavior
-- OptiX:
-  - Implement clusters first, then templates
-  - Gate “cluster-acceleration-structure”; enable when device reports support
-- Vulkan/DX:
-  - Initially return NotImplemented for cluster/template build types
-  - Add support later without changing the common headers
-- Structured grids:
-  - Excluded from common API for now; can be added as OptiX-only extension via `next`
- - Motion blur:
-   - Not supported for cluster builds in the MVP; no motion options are exposed
-
-### Validation, return codes, and errors
-- Unknown `next` nodes: return UnsupportedExtension
-- Feature absent on device: return NotAvailable
-- Feature not implemented on a backend: return NotImplemented
-- Buffer sizes/strides/formats must match counts; enforce alignment/stride rules
-
-### About `next` extension pointers
-- Purpose: reserve an extensibility point on ABI structs without breaking binary layout. This allows future nodes (e.g., structured clusters, OMM, backend-specific knobs) to be chained.
-- MVP requirement: all `next` pointers must be null; callers must not supply extension nodes.
-- Behavior: if a non-null `next` is observed, return UnsupportedExtension. This keeps the surface forward-compatible without accidental opt-in.
-
-### Testing and examples
-- Add a guarded smoke path in an example app (`device->has_feature("cluster-acceleration-structure")`)
-- Location: `examples/clusters/` (new), or extend an existing raytracing example with a guarded path
-- Scope: triangles → clusters → GAS on OptiX; verify no crashes and basic output
-- Later: templates flow + readback validation
-
-
-### Notes
-- Templates are part of the same feature (“cluster-acceleration-structure”) and included in headers from the start; implementation lands in a staged manner locally
-- OMM is not exposed in MVP; all related fields remain zero
-- Maintain compile-ability at every step; new calls default to NotImplemented before backend support arrives
+### Validation and errors
+- Feature absent on device: NotAvailable; not implemented on backend: NotImplemented; enforce buffer sizes/strides/formats.
