@@ -6,7 +6,7 @@
   - Core clusters and templates: “cluster-acceleration-structure” (in the existing ray tracing section)
 - MVP scope:
   - Build types: CLASFromTriangles, BLASFromCLAS
-  - Include unstructured TemplatesFromTriangles and ClustersFromTemplates in headers now (core feature), implement in a follow-up local stage
+  - Include unstructured TemplatesFromTriangles and CLASFromTemplates in headers now (core feature), implement in a follow-up local stage
   - Exclude structured grid clusters (OptiX-only) from common API for now
 
 ## CRITICAL: device-args ABI (zero‑copy)
