@@ -36,14 +36,16 @@
   - Location: `examples/clusters/simple_unstructured` (or extend an existing raytracing example)
 - [ ] Step 6: Templates (unstructured)
   - Acceptance: templates build path works on OptiX; outputs are device addresses (no object types)
-  
+
 
 ## OptiX/Vulkan/DX References
 - A reference copy of OptiX headers such as optix_host.h can be found in reference/optix-include/
 - for Vulkan: reference/vk-extension
 - for DX: reference/nvapi
 - These are our three backends; the RHI surface for clusters must remain cross‑compatible. When terminology or behavior is ambiguous, stop and ask
- - OptiX cluster sample: reference/optix-cluster-example/ (host/device flow for unstructured clusters)
+ - OptiX cluster samples:
+    reference/optix-cluster-example/ (host/device flow for unstructured clusters)
+    reference/optix-cluster-example-structured/ (structured grid clusters, but could be adapted to unstructured)
 
 ## Agent quickstart (starting mid-stream)
 - Identify current step:
