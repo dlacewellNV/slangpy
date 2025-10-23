@@ -8,6 +8,7 @@
 #include "sgl/device/resource.h"
 #include "sgl/device/shader_object.h"
 #include "sgl/device/raytracing.h"
+#include "sgl/device/cluster_accel.h"
 
 #include "sgl/core/object.h"
 #include "sgl/core/static_vector.h"
@@ -351,6 +352,13 @@ public:
 
     void serialize_acceleration_structure(BufferOffsetPair dst, AccelerationStructure* src);
     void deserialize_acceleration_structure(AccelerationStructure* dst, BufferOffsetPair src);
+
+    // Build a cluster acceleration structure.
+    void build_cluster_acceleration_structure(
+        const ClusterAccelBuildDesc& desc,
+        BufferOffsetPair scratch_buffer,
+        BufferOffsetPair result_buffer
+    );
 
     /**
      * Transition resource state of a buffer and add a barrier if state has changed.
