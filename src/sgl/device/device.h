@@ -8,6 +8,7 @@
 #include "sgl/device/resource.h"
 #include "sgl/device/shader.h"
 #include "sgl/device/raytracing.h"
+#include "sgl/device/cluster_accel.h"
 
 #include "sgl/core/fwd.h"
 #include "sgl/core/config.h"
@@ -405,6 +406,9 @@ public:
      * \return Acceleration structure sizes.
      */
     AccelerationStructureSizes get_acceleration_structure_sizes(const AccelerationStructureBuildDesc& desc);
+
+    /// Query buffer sizes required for cluster acceleration structure builds.
+    ClusterAccelSizes get_cluster_acceleration_structure_sizes(const ClusterAccelBuildDesc& desc);
 
     ref<AccelerationStructure> create_acceleration_structure(AccelerationStructureDesc desc);
 

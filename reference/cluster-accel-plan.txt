@@ -20,11 +20,11 @@
 - Kernels write args; insert a UAV/global barrier before the build that consumes them; ensure buffer visibility for the backend.
 
 ## Session checklist (tick as you go)
-- [ ] Step 1: RHI headers — compile-only
+- [X] Step 1: RHI headers — compile-only
   - Acceptance: headers compile; device/encoder stubs link; feature name recognized
-- [ ] Step 2: sgl headers — compile-only
+- [X] Step 2: sgl headers — compile-only
   - Acceptance: sgl compiles; converter builds; encoder exposes method
-- [ ] Step 3: Feature wiring — defaults off
+- [X] Step 3: Feature wiring — defaults off
   - Acceptance: feature registered in RHI and mirrored in sgl; defaults off
 - [ ] Step 4: OptiX backend — clusters MVP
   - Acceptance: sizes/build for triangles→clusters and clusters→BLAS work on OptiX

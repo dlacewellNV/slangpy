@@ -538,6 +538,27 @@ AccelerationStructureSizes Device::get_acceleration_structure_sizes(const Accele
     };
 }
 
+ClusterAccelSizes Device::get_cluster_acceleration_structure_sizes(const ClusterAccelBuildDesc& desc)
+{
+    SGL_CHECK(has_feature(Feature::cluster_acceleration_structure), "Cluster acceleration structure is not available.");
+
+    rhi::ClusterAccelBuildDesc rhi_desc = {};
+    rhi_desc.op = static_cast<rhi::ClusterAccelBuildOp>(desc.op);
+    rhi_desc.argsBuffer = rhi::BufferOffsetPair(
+        desc.args_buffer.buffer ? desc.args_buffer.buffer->rhi_buffer() : nullptr,
+        desc.args_buffer.offset
+    );
+    rhi_desc.argsStride = desc.args_stride;
+    rhi_desc.argCount = desc.arg_count;
+    rhi_desc.next = nullptr;
+    rhi::ClusterAccelSizes rhi_sizes = {};
+    SLANG_RHI_CALL(m_rhi_device->getClusterAccelerationStructureSizes(rhi_desc, &rhi_sizes));
+    return {
+        .result_size = rhi_sizes.resultSize,
+        .scratch_size = rhi_sizes.scratchSize,
+    };
+}
+
 ref<AccelerationStructure> Device::create_acceleration_structure(AccelerationStructureDesc desc)
 {
     return make_ref<AccelerationStructure>(ref<Device>(this), std::move(desc));

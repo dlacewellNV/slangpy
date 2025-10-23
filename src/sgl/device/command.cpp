@@ -762,6 +762,29 @@ void CommandEncoder::deserialize_acceleration_structure(AccelerationStructure* d
     m_rhi_command_encoder->deserializeAccelerationStructure(dst->rhi_acceleration_structure(), detail::to_rhi(src));
 }
 
+void CommandEncoder::build_cluster_acceleration_structure(
+    const ClusterAccelBuildDesc& desc,
+    BufferOffsetPair scratch_buffer,
+    BufferOffsetPair result_buffer
+)
+{
+    SGL_CHECK(m_open, "Command encoder is finished");
+    SGL_CHECK(m_device->has_feature(Feature::cluster_acceleration_structure), "Cluster acceleration structure is not available.");
+
+    rhi::ClusterAccelBuildDesc rhi_desc = {
+        .op = static_cast<rhi::ClusterAccelBuildOp>(desc.op),
+        .argsBuffer = detail::to_rhi(desc.args_buffer),
+        .argsStride = desc.args_stride,
+        .argCount = desc.arg_count,
+        .next = nullptr,
+    };
+    m_rhi_command_encoder->buildClusterAccelerationStructure(
+        rhi_desc,
+        detail::to_rhi(scratch_buffer),
+        detail::to_rhi(result_buffer)
+    );
+}
+
 void CommandEncoder::convert_coop_vec_matrices(
     Buffer* dst,
     std::span<const CoopVecMatrixDesc> dst_descs,
