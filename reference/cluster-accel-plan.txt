@@ -26,25 +26,21 @@
   - Acceptance: sgl compiles; converter builds; encoder exposes method
 - [X] Step 3: Feature wiring — defaults off
   - Acceptance: feature registered in RHI and mirrored in sgl; defaults off
-- [ ] Step 4: OptiX backend — clusters MVP
+- [X] Step 4: OptiX backend — clusters MVP
   - Acceptance: sizes/build for triangles→clusters and clusters→BLAS work on OptiX
-  - Add a minimal OptiX-only smoke test: one `*Args` record in a device buffer → build → verify non‑zero output handle(s)/sizes; log basic stats
+  - Add OptiX-only smoke tests, e.g, one `*Args` record in a device buffer → build → verify non‑zero output handle(s)/sizes; log basic stats
   - Use `reference/optix-cluster-example/` as guidance for field packing and expected build behavior
-  - Substeps
-    - Implemented:
-      - OptiX v9+ CLAS sizes/build, version-gated; older returns NotAvailable
-      - Added `ClusterAccelLimits*` to desc; both limits required for now
-      - CUDA device advertises `cluster-acceleration-structure` feature on OptiX ≥ 9
-      - Non-CUDA backends: NotSupported stubs; build compiles
-    - Remaining:
-      - Mirror limits in sgl and pass-through
-      - Add minimal OptiX-only smoke test (1 record; sizes/build; log)
-      - Validate inputs/strides for cluster builds in encoder
-      - Document required limits in API comments
-- [ ] Step 5: sgl conversion + smoke test
+- [ ] Step 5: sgl conversion + example path
   - Acceptance: guarded example path runs; feature‑check gates code path
   - Example: triangles → clusters → BLAS, behind `device->has_feature("cluster-acceleration-structure")`; print handle count/size
   - Location: `examples/clusters/simple_unstructured` (or extend an existing raytracing example)
+  - Details (concise):
+    - Feature gate and entry: add example path, guard all work on `Feature::cluster_acceleration_structure`.
+    - Device ABI: create `cluster_accel_abi.slang` with packed u32/u64 Args (TrianglesArgs, ClustersArgs). Host treats buffers as opaque; optional tiny host mirror for tests/tools.
+    - Flow: kernels write N TrianglesArgs → global_barrier → sizes → build CLAS; read 8-byte handles from start of result buffer (handle table), then build BLASFromCLAS using a single ClustersArgs pointing at that handle table.
+    - Handles: implicit mode packs 8-byte handles at the start of the result; outputs follow at a 128-byte aligned offset.
+    - Validation: if feature/version missing → skip; missing/zero required limits → error; basic asserts (sizes > 0; first handle non‑zero; BLAS output non‑zero).
+    - Optional follow‑up: tiny OptiX-only raytrace smoke (single ray, assert hit) after CLAS/BLAS build.
 - [ ] Step 6: Templates (unstructured)
   - Acceptance: templates build path works on OptiX; outputs are device addresses (no object types)
 
