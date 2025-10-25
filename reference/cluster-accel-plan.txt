@@ -30,6 +30,17 @@
   - Acceptance: sizes/build for triangles→clusters and clusters→BLAS work on OptiX
   - Add a minimal OptiX-only smoke test: one `*Args` record in a device buffer → build → verify non‑zero output handle(s)/sizes; log basic stats
   - Use `reference/optix-cluster-example/` as guidance for field packing and expected build behavior
+  - Substeps
+    - Implemented:
+      - OptiX v9+ CLAS sizes/build, version-gated; older returns NotAvailable
+      - Added `ClusterAccelLimits*` to desc; both limits required for now
+      - CUDA device advertises `cluster-acceleration-structure` feature on OptiX ≥ 9
+      - Non-CUDA backends: NotSupported stubs; build compiles
+    - Remaining:
+      - Mirror limits in sgl and pass-through
+      - Add minimal OptiX-only smoke test (1 record; sizes/build; log)
+      - Validate inputs/strides for cluster builds in encoder
+      - Document required limits in API comments
 - [ ] Step 5: sgl conversion + smoke test
   - Acceptance: guarded example path runs; feature‑check gates code path
   - Example: triangles → clusters → BLAS, behind `device->has_feature("cluster-acceleration-structure")`; print handle count/size
