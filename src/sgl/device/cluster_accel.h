@@ -34,6 +34,20 @@ struct ClusterAccelSizes {
     DeviceSize scratch_size{0};
 };
 
+struct ClusterAccelLimitsTriangles {
+    uint32_t max_arg_count{0};
+    uint32_t max_triangle_count_per_arg{0};
+    uint32_t max_vertex_count_per_arg{0};
+    uint32_t max_unique_sbt_index_count_per_arg{0};
+    uint32_t position_truncate_bit_count{0};
+};
+
+struct ClusterAccelLimitsClusters {
+    uint32_t max_arg_count{0};
+    uint32_t max_total_cluster_count{0};
+    uint32_t max_cluster_count_per_arg{0};
+};
+
 struct ClusterAccelBuildDesc {
     /// Operation to perform.
     ClusterAccelBuildOp op{ClusterAccelBuildOp::clas_from_triangles};
@@ -44,6 +58,12 @@ struct ClusterAccelBuildDesc {
     uint32_t args_stride{0};
     /// Number of arg records to consume from args_buffer.
     uint32_t arg_count{0};
+
+    /// Required in MVP: per‑op limits/hints to assist backends.
+    /// Provide both structures for CLASFromTriangles and BLASFromCLAS.
+    /// A value of 0 is invalid for required fields in MVP.
+    ClusterAccelLimitsTriangles triangles_limits{};
+    ClusterAccelLimitsClusters clusters_limits{};
 };
 
 } // namespace sgl

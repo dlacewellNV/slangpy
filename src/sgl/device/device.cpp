@@ -542,6 +542,24 @@ ClusterAccelSizes Device::get_cluster_acceleration_structure_sizes(const Cluster
 {
     SGL_CHECK(has_feature(Feature::cluster_acceleration_structure), "Cluster acceleration structure is not available.");
 
+    // MVP: limits are required. Align with OptiX requirements.
+    if (desc.op == ClusterAccelBuildOp::clas_from_triangles) {
+        SGL_CHECK(desc.triangles_limits.max_arg_count > 0, "triangles_limits.max_arg_count must be > 0");
+        SGL_CHECK(desc.triangles_limits.max_triangle_count_per_arg > 0, "triangles_limits.max_triangle_count_per_arg must be > 0");
+        SGL_CHECK(desc.triangles_limits.max_vertex_count_per_arg > 0, "triangles_limits.max_vertex_count_per_arg must be > 0");
+        SGL_CHECK(
+            desc.triangles_limits.max_unique_sbt_index_count_per_arg > 0,
+            "triangles_limits.max_unique_sbt_index_count_per_arg must be > 0"
+        );
+    }
+    else if (desc.op == ClusterAccelBuildOp::blas_from_clas) {
+        SGL_CHECK(desc.clusters_limits.max_arg_count > 0, "clusters_limits.max_arg_count must be > 0");
+        SGL_CHECK(desc.clusters_limits.max_total_cluster_count > 0, "clusters_limits.max_total_cluster_count must be > 0");
+        SGL_CHECK(desc.clusters_limits.max_cluster_count_per_arg > 0, "clusters_limits.max_cluster_count_per_arg must be > 0");
+    }
+
+    // Note: For GET_SIZES, OptiX does not require args array; only limits are used.
+
     rhi::ClusterAccelBuildDesc rhi_desc = {};
     rhi_desc.op = static_cast<rhi::ClusterAccelBuildOp>(desc.op);
     rhi_desc.argsBuffer = rhi::BufferOffsetPair(
@@ -551,6 +569,15 @@ ClusterAccelSizes Device::get_cluster_acceleration_structure_sizes(const Cluster
     rhi_desc.argsStride = desc.args_stride;
     rhi_desc.argCount = desc.arg_count;
     rhi_desc.next = nullptr;
+    // Pass through limits (required in MVP)
+    rhi_desc.trianglesLimits.maxArgCount = desc.triangles_limits.max_arg_count;
+    rhi_desc.trianglesLimits.maxTriangleCountPerArg = desc.triangles_limits.max_triangle_count_per_arg;
+    rhi_desc.trianglesLimits.maxVertexCountPerArg = desc.triangles_limits.max_vertex_count_per_arg;
+    rhi_desc.trianglesLimits.maxUniqueSbtIndexCountPerArg = desc.triangles_limits.max_unique_sbt_index_count_per_arg;
+    rhi_desc.trianglesLimits.positionTruncateBitCount = desc.triangles_limits.position_truncate_bit_count;
+    rhi_desc.clustersLimits.maxArgCount = desc.clusters_limits.max_arg_count;
+    rhi_desc.clustersLimits.maxTotalClusterCount = desc.clusters_limits.max_total_cluster_count;
+    rhi_desc.clustersLimits.maxClusterCountPerArg = desc.clusters_limits.max_cluster_count_per_arg;
     rhi::ClusterAccelSizes rhi_sizes = {};
     SLANG_RHI_CALL(m_rhi_device->getClusterAccelerationStructureSizes(rhi_desc, &rhi_sizes));
     return {
