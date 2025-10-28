@@ -32,22 +32,19 @@
   - Use `reference/optix-cluster-example/` as guidance for field packing and expected build behavior
 - [X] Step 4.1: Convert the sgl_test smoke tests above into slang-rhi tests in the slang-rhi submodule
   - Acceptance: slang-rhi-tests passes with a test filter for the new tests
-  [ ] Step 4.2: Expose a flag on the raytracing pipeline to enable clusters.  As reference, consult the optix/vk/dx apis in the reference directories mentioned later in this document.
-- [ ] Step 5: new sgl cluster example
-  - Acceptance: guarded example path runs; feature‑check gates code path
-  - Example: triangles → clusters → BLAS, behind `device->has_feature("cluster-acceleration-structure")`; print handle count/size.  Build a pipeline and shoot rays, very similar to the raytracing pipeline example.
-  - sgl location: `examples/raytracing_pipeline_clusters`
-  - Details:
-    - Feature gate and entry: add example path, guard all work on `Feature::cluster_acceleration_structure`.
-    - Device ABI: create `cluster_accel_abi.slang` with packed u32/u64 Args (TrianglesArgs, ClustersArgs). Host treats buffers as opaque; optional tiny host mirror for tests/tools.
-    - Flow: kernels write N TrianglesArgs → global_barrier → sizes → build CLAS; read handles from start of result buffer (handle table), then build BLASFromCLAS using a single ClustersArgs pointing at that handle table.
-    - Handles: implicit mode packs 8-byte handles at the start of the result; outputs follow at a 128-byte aligned offset.
-    - Validation: if feature/version missing → skip; missing/zero required limits → error; basic asserts (sizes > 0; first handle non‑zero; BLAS output non‑zero).
-    - Shoot rays using a raytracing kernel similar to the raytracing_pipeline example, and write a barycentric color.
-- [ ] Step 6: add a cluster-accel test to slang-rhi that shoots a ray, records the hit, and compares it to known values.  This builds on Step 5 closely.
-  - Acceptance: slang-rhi-tests.exe still passes
-  - Test should exercise GetClusterID, and barycentrics for the hit
-  - Decide what to do with cluster_accel_abi.slang - mirror it to slang-rhi or put the canonical version in slang-rhi and use it from sgl
+  [X] Step 4.2: Expose a flag on the raytracing pipeline to enable clusters.  As reference, consult the optix/vk/dx apis in the reference directories mentioned later in this document.
+- [X] Step 5: new sgl cluster example
+  - Acceptance: example runs under feature gate; logs CLAS/BLAS sizes; renders an image.
+  - Implemented at `examples/raytracing_pipeline_clusters`: triangles → CLAS → BLAS → TLAS → shoot rays.
+  - Bootstrap notes: feature gate only; clusters flag on pipeline; device‑args written then global barrier; result buffer starts with 8‑byte handles; multi‑triangle clusters (two strips) share an index buffer with per‑cluster vertex base offsets.
+ 
+- [ ] Step 6: slang‑rhi cluster tests (build‑and‑shoot)
+-  - Acceptance: tests pass; OptiX‑only tests skip elsewhere.
+-  - Canonicalize ABI in slang‑rhi (device header + tiny host mirror), u32/u64 POD only.
+-  - Tests:
+-    - Build‑and‑shoot: two clusters (shared indices, per‑cluster vertex base), BLASFromCLAS with 2 handles, TLAS, clusters pipeline flag; raygen writes barycentrics; assert CLAS/BLAS non‑zero and two horizontal hit bands.
+-    - Device‑args variant: write `TrianglesArgs` on device, insert global barrier, then build CLAS; verify parity with host‑filled args.
+-  - Optional: record `GetClusterID` at a known pixel.
 - [ ] Step 7: Templates (unstructured)
   - Acceptance: templates build path works on OptiX; outputs are device addresses (no object types)
 
