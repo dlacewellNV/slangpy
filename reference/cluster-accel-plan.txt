@@ -30,6 +30,10 @@
   - Acceptance: sizes/build for triangles→clusters and clusters→BLAS work on OptiX
   - Add OptiX-only smoke tests, e.g, one `*Args` record in a device buffer → build → verify non‑zero output handle(s)/sizes; log basic stats
   - Use `reference/optix-cluster-example/` as guidance for field packing and expected build behavior
+- [ ] Step 4.1: Convert some of the sgl_test smoke tests above into slang-rhi tests in the slang-rhi submodule
+  - Identify sgl cluster accel tests that might make more sense in slang-rhi and propose a subset to move
+  - Once agreed upon, convert these tests to slang-rhi and remove them from sgl
+  - Acceptance: slang-rhi-tests passes with a test filter for the new tests
 - [ ] Step 5: sgl conversion + example path
   - Acceptance: guarded example path runs; feature‑check gates code path
   - Example: triangles → clusters → BLAS, behind `device->has_feature("cluster-acceleration-structure")`; print handle count/size
