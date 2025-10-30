@@ -762,11 +762,7 @@ void CommandEncoder::deserialize_acceleration_structure(AccelerationStructure* d
     m_rhi_command_encoder->deserializeAccelerationStructure(dst->rhi_acceleration_structure(), detail::to_rhi(src));
 }
 
-void CommandEncoder::build_cluster_acceleration_structure(
-    const ClusterAccelBuildDesc& desc,
-    BufferOffsetPair scratch_buffer,
-    BufferOffsetPair result_buffer
-)
+void CommandEncoder::build_cluster_acceleration_structure(const ClusterAccelBuildDesc& desc)
 {
     SGL_CHECK(m_open, "Command encoder is finished");
     SGL_CHECK(m_device->has_feature(Feature::cluster_acceleration_structure), "Cluster acceleration structure is not available.");
@@ -787,6 +783,28 @@ void CommandEncoder::build_cluster_acceleration_structure(
     SGL_CHECK(desc.arg_count > 0, "arg_count must be > 0");
     SGL_CHECK(desc.args_stride > 0, "args_stride must be > 0");
     SGL_CHECK(desc.args_buffer.buffer, "args_buffer must be non-null");
+
+    // Validate required buffers per build mode
+    switch (desc.mode)
+    {
+    case ClusterAccelBuildDesc::BuildMode::implicit:
+        SGL_CHECK(desc.implicit.output_buffer != 0, "implicit.output_buffer must be set");
+        SGL_CHECK(desc.implicit.output_buffer_size_in_bytes != 0, "implicit.output_buffer_size_in_bytes must be > 0");
+        SGL_CHECK(desc.implicit.temp_buffer != 0, "implicit.temp_buffer must be set");
+        SGL_CHECK(desc.implicit.temp_buffer_size_in_bytes != 0, "implicit.temp_buffer_size_in_bytes must be > 0");
+        SGL_CHECK(desc.implicit.output_handles_buffer != 0, "implicit.output_handles_buffer must be set");
+        break;
+    case ClusterAccelBuildDesc::BuildMode::explicit_destinations:
+        SGL_CHECK(desc.explicit_dest.temp_buffer != 0, "explicit.temp_buffer must be set");
+        SGL_CHECK(desc.explicit_dest.temp_buffer_size_in_bytes != 0, "explicit.temp_buffer_size_in_bytes must be > 0");
+        SGL_CHECK(desc.explicit_dest.dest_addresses_buffer != 0, "explicit.dest_addresses_buffer must be set");
+        break;
+    case ClusterAccelBuildDesc::BuildMode::get_sizes:
+        SGL_CHECK(desc.get_sizes.temp_buffer != 0, "get_sizes.temp_buffer must be set");
+        SGL_CHECK(desc.get_sizes.temp_buffer_size_in_bytes != 0, "get_sizes.temp_buffer_size_in_bytes must be > 0");
+        SGL_CHECK(desc.get_sizes.output_sizes_buffer != 0, "get_sizes.output_sizes_buffer must be set");
+        break;
+    }
 
     rhi::ClusterAccelBuildDesc rhi_desc = {
         .op = static_cast<rhi::ClusterAccelBuildOp>(desc.op),
@@ -809,6 +827,8 @@ void CommandEncoder::build_cluster_acceleration_structure(
     switch (desc.mode) {
     case ClusterAccelBuildDesc::BuildMode::explicit_destinations:
         rhi_desc.mode = rhi::ClusterAccelBuildDesc::BuildMode::Explicit;
+        rhi_desc.modeDesc.explicitDest.tempBuffer = desc.explicit_dest.temp_buffer;
+        rhi_desc.modeDesc.explicitDest.tempBufferSizeInBytes = desc.explicit_dest.temp_buffer_size_in_bytes;
         rhi_desc.modeDesc.explicitDest.destAddressesBuffer = desc.explicit_dest.dest_addresses_buffer;
         rhi_desc.modeDesc.explicitDest.destAddressesStrideInBytes = desc.explicit_dest.dest_addresses_stride_in_bytes;
         rhi_desc.modeDesc.explicitDest.outputHandlesBuffer = desc.explicit_dest.output_handles_buffer;
@@ -818,22 +838,29 @@ void CommandEncoder::build_cluster_acceleration_structure(
         break;
     case ClusterAccelBuildDesc::BuildMode::get_sizes:
         rhi_desc.mode = rhi::ClusterAccelBuildDesc::BuildMode::GetSizes;
+        rhi_desc.modeDesc.getSizes.tempBuffer = desc.get_sizes.temp_buffer;
+        rhi_desc.modeDesc.getSizes.tempBufferSizeInBytes = desc.get_sizes.temp_buffer_size_in_bytes;
         rhi_desc.modeDesc.getSizes.outputSizesBuffer = desc.get_sizes.output_sizes_buffer;
         rhi_desc.modeDesc.getSizes.outputSizesStrideInBytes = desc.get_sizes.output_sizes_stride_in_bytes;
         break;
     case ClusterAccelBuildDesc::BuildMode::implicit:
     default:
         rhi_desc.mode = rhi::ClusterAccelBuildDesc::BuildMode::Implicit;
+        rhi_desc.modeDesc.implicit.outputBuffer = desc.implicit.output_buffer;
+        rhi_desc.modeDesc.implicit.outputBufferSizeInBytes = desc.implicit.output_buffer_size_in_bytes;
+        rhi_desc.modeDesc.implicit.tempBuffer = desc.implicit.temp_buffer;
+        rhi_desc.modeDesc.implicit.tempBufferSizeInBytes = desc.implicit.temp_buffer_size_in_bytes;
         rhi_desc.modeDesc.implicit.outputHandlesBuffer = desc.implicit.output_handles_buffer;
         rhi_desc.modeDesc.implicit.outputHandlesStrideInBytes = desc.implicit.output_handles_stride_in_bytes;
         rhi_desc.modeDesc.implicit.outputSizesBuffer = desc.implicit.output_sizes_buffer;
         rhi_desc.modeDesc.implicit.outputSizesStrideInBytes = desc.implicit.output_sizes_stride_in_bytes;
         break;
     }
+    // Pass null buffers; backend consumes buffers from desc
     m_rhi_command_encoder->buildClusterAccelerationStructure(
         rhi_desc,
-        detail::to_rhi(scratch_buffer),
-        detail::to_rhi(result_buffer)
+        rhi::BufferOffsetPair(nullptr, 0),
+        rhi::BufferOffsetPair(nullptr, 0)
     );
 }
 

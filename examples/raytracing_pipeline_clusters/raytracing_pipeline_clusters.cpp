@@ -166,8 +166,19 @@ int main()
         // Ensure visibility of UAV writes
         enc->global_barrier();
 
-        // Build CLAS
-        enc->build_cluster_acceleration_structure(clasDesc, {clasScratch, 0}, {clasResult, 0});
+        // Build CLAS (implicit mode) — set required buffers in desc
+        auto alignUp = [](uint64_t v, uint64_t a) { return (v + (a - 1)) & ~(a - 1); };
+        uint64_t handlesBytes = uint64_t(clusterCount) * 8u;
+        uint64_t handlesPad128 = alignUp(handlesBytes, 128);
+        clasDesc.mode = ClusterAccelBuildDesc::BuildMode::implicit;
+        clasDesc.implicit.output_handles_buffer = clasResult->device_address();
+        clasDesc.implicit.output_handles_stride_in_bytes = 0; // 0 -> 8
+        clasDesc.implicit.output_buffer = clasResult->device_address() + handlesPad128;
+        clasDesc.implicit.output_buffer_size_in_bytes = clasResult->size();
+        clasDesc.implicit.temp_buffer = clasScratch->device_address();
+        clasDesc.implicit.temp_buffer_size_in_bytes = clasScratch->size();
+
+        enc->build_cluster_acceleration_structure(clasDesc);
         device->submit_command_buffer(enc->finish());
     }
 
@@ -218,7 +229,19 @@ int main()
 
     {
         auto enc = device->create_command_encoder();
-        enc->build_cluster_acceleration_structure(blasDesc, {blasScratch, 0}, {blasResult, 0});
+        // Build BLAS from CLAS (implicit mode) — set required buffers in desc
+        auto alignUp = [](uint64_t v, uint64_t a) { return (v + (a - 1)) & ~(a - 1); };
+        uint64_t blasHandlesBytes = uint64_t(1) * 8u;
+        uint64_t blasHandlesPad128 = alignUp(blasHandlesBytes, 128);
+        blasDesc.mode = ClusterAccelBuildDesc::BuildMode::implicit;
+        blasDesc.implicit.output_handles_buffer = blasResult->device_address();
+        blasDesc.implicit.output_handles_stride_in_bytes = 0; // 0 -> 8
+        blasDesc.implicit.output_buffer = blasResult->device_address() + blasHandlesPad128;
+        blasDesc.implicit.output_buffer_size_in_bytes = blasResult->size();
+        blasDesc.implicit.temp_buffer = blasScratch->device_address();
+        blasDesc.implicit.temp_buffer_size_in_bytes = blasScratch->size();
+
+        enc->build_cluster_acceleration_structure(blasDesc);
         device->submit_command_buffer(enc->finish());
     }
 
