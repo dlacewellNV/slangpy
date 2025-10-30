@@ -70,6 +70,11 @@ struct ClusterAccelBuildDesc {
     BuildMode mode{BuildMode::implicit};
 
     struct ImplicitDesc {
+        // Required output and temporary buffers for Implicit mode
+        uint64_t output_buffer{0};
+        uint64_t output_buffer_size_in_bytes{0};
+        uint64_t temp_buffer{0};
+        uint64_t temp_buffer_size_in_bytes{0};
         uint64_t output_handles_buffer{0};
         uint32_t output_handles_stride_in_bytes{0}; // 0 -> 8
         uint64_t output_sizes_buffer{0};
@@ -77,6 +82,9 @@ struct ClusterAccelBuildDesc {
     } implicit{};
 
     struct ExplicitDesc {
+        // Required temporary buffer for Explicit mode
+        uint64_t temp_buffer{0};
+        uint64_t temp_buffer_size_in_bytes{0};
         uint64_t dest_addresses_buffer{0};         // required in Explicit
         uint32_t dest_addresses_stride_in_bytes{0}; // 0 -> 8
         uint64_t output_handles_buffer{0};          // 0 -> alias dest addresses
@@ -86,6 +94,9 @@ struct ClusterAccelBuildDesc {
     } explicit_dest{};
 
     struct GetSizesDesc {
+        // Required temporary buffer for GetSizes mode
+        uint64_t temp_buffer{0};
+        uint64_t temp_buffer_size_in_bytes{0};
         uint64_t output_sizes_buffer{0};
         uint32_t output_sizes_stride_in_bytes{0};   // 0 -> 4
     } get_sizes{};

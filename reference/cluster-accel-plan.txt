@@ -38,28 +38,19 @@
   - Implemented at `examples/raytracing_pipeline_clusters`: triangles → CLAS → BLAS → TLAS → shoot rays.
   - Bootstrap notes: feature gate only; clusters flag on pipeline; device‑args written then global barrier; result buffer starts with 8‑byte handles; multi‑triangle clusters (two strips) share an index buffer with per‑cluster vertex base offsets.
 
-- [X] Step 6: explicit CLAS build mode (user‑provided destinations)
-  - Acceptance: enum selects Explicit; OptiX builds each CLAS into caller‑provided addresses; returns handles/sizes when requested; GetSizes path works to pre‑size destinations; existing Implicit path unchanged
-  - RHI surface: ensure build mode enum has Implicit/Explicit/GetSizes; extend build desc with explicit fields: `destAddressesBuffer` (device address of array), `destAddressesStrideInBytes` (u32); optional `outputHandlesBuffer`/`outputHandlesStrideInBytes`, optional `outputSizesBuffer`/`outputSizesStrideInBytes`. Mutually exclusive with Implicit fields; debug‑layer validates exclusivity, presence, alignment (>=8), and strides
-  - sgl layer: mirror enum/desc; wrapper forwards explicit fields; default mode remains Implicit for back‑compat
-  - Backend (OptiX): route Explicit to `OptixClusterAccelBuildModeDescExplicitDest` with temp buffer; implement GetSizes via `OptixClusterAccelBuildModeDescGetSize` in a dry‑run call; verify mode maps 1:1 to OptiX build mode
-  - Other backends: Vulkan/DX return NotImplemented/NotAvailable for Explicit/GetSizes in MVP
-  - Tests (slang‑rhi): OptiX‑only
-    - Explicit build of 2 CLAS: call GetSizes → allocate one big buffer → fill `destAddressesBuffer` with per‑CLAS offsets → build Explicit → assert non‑zero handles and sizes and distinct destinations
-    - Validation negatives: missing `destAddressesBuffer`, zero/odd stride, setting both Implicit and Explicit fields → expect validation error
-  - Docs: clarify mode semantics and when to prefer GetSizes+Explicit vs Implicit
+- [X] Step 6: Explicit CLAS mode (context only)
+  - Add Explicit/GetSizes modes alongside Implicit; Explicit uses per‑CLAS destination addresses; GetSizes for pre‑sizing
+  - OptiX path implemented; DX/VK NotAvailable for now
 
-- [ ] Step 6.5: SGL extensions for Step 6 (modes + wrappers)
-  - Acceptance: existing example `examples/raytracing_pipeline_clusters` remains unchanged for Implicit; new Explicit/GetSizes desc fields available; default behavior preserves current implicit packing
-  - SGL API:
-    - Add `ClusterAccelBuildMode { Implicit, Explicit, GetSizes }` (default Implicit). If `explicit.destAddressesBuffer` is set and mode omitted, infer Explicit
-    - Extend `ClusterAccelBuildDesc` with three mode‑specific sub‑descs mirroring OptiX: `implicit`, `explicitDest`, `getSizes`; keep shared `argsArray/argsCount/argsStride`
-  - Implicit wrapper behavior (default/simple): keep single‑arena packing; no explicit handles params required at high level. Internally point `outputHandlesBuffer` (and optionally `outputSizesBuffer`) to subranges of the provided result buffer
-  - Implicit advanced (opt‑in): allow apps to supply separate `outputHandlesBuffer` and/or `outputSizesBuffer`; validation ensures proper stride/alignment; if unset, use default packing
-  - Explicit behavior: require `destAddressesBuffer` (+ stride). `outputHandlesBuffer` is required by OptiX; default to aliasing it to `destAddressesBuffer` (handles overwrite input addresses). Accept a distinct `outputHandlesBuffer` if the app wants to preserve original destinations. `outputSizesBuffer` remains optional
-  - GetSizes helper: expose a simple helper to fill a sizes array; optional higher‑level helper that performs GetSizes, plans placements, fills `destAddressesBuffer`, and then issues Explicit build
-  - Validation: enforce mutual exclusivity of Implicit vs Explicit fields; check alignment (>=8) and strides; error if both aliasing and separate buffers are specified inconsistently
-  - Docs: note that for CLAS/templates a handle equals the device address; for GAS‑from‑CLAS the handle is an opaque traversable; clarify aliasing rules and when to use separate handles buffer
+- [X] Step 6.5: SGL (context only)
+  - Build modes and mode‑specific descs added; required buffers live in the desc (Implicit/Explicit/GetSizes)
+  - Example updated; backend consumes buffers from desc
+
+- [ ] Step 6.6: RHI/backend API cleanup
+  - Acceptance: RHI `buildClusterAccelerationStructure` no longer takes `scratch/result` parameters; backends consume buffers exclusively from the build desc
+  - Update: remove scratch/result from RHI interface and implementations (OptiX, debug layer, command paths); adjust tests/examples to set buffers in desc
+  - Validation: enforce required per‑mode buffers at RHI layer; meaningful errors if missing/misaligned
+  - SGL convenience: think about a small helper to compute handles padding and populate implicit desc fields (handles/output/temp) from a single buffer + arg count, to keep samples concise
 - [ ] Step 7: slang‑rhi cluster tests (build‑and‑shoot)
 -  - Acceptance: tests pass; OptiX‑only tests skip elsewhere.
 -  - Canonicalize ABI in slang‑rhi (device header + tiny host mirror), u32/u64 POD only.
