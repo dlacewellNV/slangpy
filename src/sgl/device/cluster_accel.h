@@ -64,6 +64,31 @@ struct ClusterAccelBuildDesc {
     /// A value of 0 is invalid for required fields in MVP.
     ClusterAccelLimitsTriangles triangles_limits{};
     ClusterAccelLimitsClusters clusters_limits{};
+
+    // Build mode and mode-specific parameters (defaults to Implicit)
+    enum class BuildMode : uint32_t { implicit = 0, explicit_destinations = 1, get_sizes = 2 };
+    BuildMode mode{BuildMode::implicit};
+
+    struct ImplicitDesc {
+        uint64_t output_handles_buffer{0};
+        uint32_t output_handles_stride_in_bytes{0}; // 0 -> 8
+        uint64_t output_sizes_buffer{0};
+        uint32_t output_sizes_stride_in_bytes{0};   // 0 -> 4
+    } implicit{};
+
+    struct ExplicitDesc {
+        uint64_t dest_addresses_buffer{0};         // required in Explicit
+        uint32_t dest_addresses_stride_in_bytes{0}; // 0 -> 8
+        uint64_t output_handles_buffer{0};          // 0 -> alias dest addresses
+        uint32_t output_handles_stride_in_bytes{0}; // 0 -> 8
+        uint64_t output_sizes_buffer{0};
+        uint32_t output_sizes_stride_in_bytes{0};   // 0 -> 4
+    } explicit_dest{};
+
+    struct GetSizesDesc {
+        uint64_t output_sizes_buffer{0};
+        uint32_t output_sizes_stride_in_bytes{0};   // 0 -> 4
+    } get_sizes{};
 };
 
 } // namespace sgl
