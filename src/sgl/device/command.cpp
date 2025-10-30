@@ -804,6 +804,32 @@ void CommandEncoder::build_cluster_acceleration_structure(
     rhi_desc.clustersLimits.maxArgCount = desc.clusters_limits.max_arg_count;
     rhi_desc.clustersLimits.maxTotalClusterCount = desc.clusters_limits.max_total_cluster_count;
     rhi_desc.clustersLimits.maxClusterCountPerArg = desc.clusters_limits.max_cluster_count_per_arg;
+
+    // Forward build mode (defaults to Implicit)
+    switch (desc.mode) {
+    case ClusterAccelBuildDesc::BuildMode::explicit_destinations:
+        rhi_desc.mode = rhi::ClusterAccelBuildDesc::BuildMode::Explicit;
+        rhi_desc.modeDesc.explicitDest.destAddressesBuffer = desc.explicit_dest.dest_addresses_buffer;
+        rhi_desc.modeDesc.explicitDest.destAddressesStrideInBytes = desc.explicit_dest.dest_addresses_stride_in_bytes;
+        rhi_desc.modeDesc.explicitDest.outputHandlesBuffer = desc.explicit_dest.output_handles_buffer;
+        rhi_desc.modeDesc.explicitDest.outputHandlesStrideInBytes = desc.explicit_dest.output_handles_stride_in_bytes;
+        rhi_desc.modeDesc.explicitDest.outputSizesBuffer = desc.explicit_dest.output_sizes_buffer;
+        rhi_desc.modeDesc.explicitDest.outputSizesStrideInBytes = desc.explicit_dest.output_sizes_stride_in_bytes;
+        break;
+    case ClusterAccelBuildDesc::BuildMode::get_sizes:
+        rhi_desc.mode = rhi::ClusterAccelBuildDesc::BuildMode::GetSizes;
+        rhi_desc.modeDesc.getSizes.outputSizesBuffer = desc.get_sizes.output_sizes_buffer;
+        rhi_desc.modeDesc.getSizes.outputSizesStrideInBytes = desc.get_sizes.output_sizes_stride_in_bytes;
+        break;
+    case ClusterAccelBuildDesc::BuildMode::implicit:
+    default:
+        rhi_desc.mode = rhi::ClusterAccelBuildDesc::BuildMode::Implicit;
+        rhi_desc.modeDesc.implicit.outputHandlesBuffer = desc.implicit.output_handles_buffer;
+        rhi_desc.modeDesc.implicit.outputHandlesStrideInBytes = desc.implicit.output_handles_stride_in_bytes;
+        rhi_desc.modeDesc.implicit.outputSizesBuffer = desc.implicit.output_sizes_buffer;
+        rhi_desc.modeDesc.implicit.outputSizesStrideInBytes = desc.implicit.output_sizes_stride_in_bytes;
+        break;
+    }
     m_rhi_command_encoder->buildClusterAccelerationStructure(
         rhi_desc,
         detail::to_rhi(scratch_buffer),
