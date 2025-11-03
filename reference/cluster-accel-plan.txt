@@ -46,7 +46,7 @@
   - Build modes and mode‑specific descs added; required buffers live in the desc (Implicit/Explicit/GetSizes)
   - Example updated; backend consumes buffers from desc
 
-- [ ] Step 6.6: RHI/backend API cleanup
+- [X] Step 6.6: RHI/backend API cleanup
   - Acceptance: RHI `buildClusterAccelerationStructure` no longer takes `scratch/result` parameters; backends consume buffers exclusively from the build desc
   - Update: remove scratch/result from RHI interface and implementations (OptiX, debug layer, command paths); adjust tests/examples to set buffers in desc
   - Validation: enforce required per‑mode buffers at RHI layer; meaningful errors if missing/misaligned

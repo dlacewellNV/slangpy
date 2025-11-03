@@ -856,12 +856,8 @@ void CommandEncoder::build_cluster_acceleration_structure(const ClusterAccelBuil
         rhi_desc.modeDesc.implicit.outputSizesStrideInBytes = desc.implicit.output_sizes_stride_in_bytes;
         break;
     }
-    // Pass null buffers; backend consumes buffers from desc
-    m_rhi_command_encoder->buildClusterAccelerationStructure(
-        rhi_desc,
-        rhi::BufferOffsetPair(nullptr, 0),
-        rhi::BufferOffsetPair(nullptr, 0)
-    );
+
+    m_rhi_command_encoder->buildClusterAccelerationStructure(rhi_desc);
 }
 
 void CommandEncoder::convert_coop_vec_matrices(

@@ -558,7 +558,9 @@ ClusterAccelSizes Device::get_cluster_acceleration_structure_sizes(const Cluster
         SGL_CHECK(desc.clusters_limits.max_cluster_count_per_arg > 0, "clusters_limits.max_cluster_count_per_arg must be > 0");
     }
 
-    // Note: For GET_SIZES, OptiX does not require args array; only limits are used.
+    // Note: getClusterAccelerationStructureSizes() is a coarse-grained limits-only query.
+    // It is distinct from BuildMode::get_sizes in the build API, which typically
+    // uses real args for a dry-run of the actual build.
 
     rhi::ClusterAccelBuildDesc rhi_desc = {};
     rhi_desc.op = static_cast<rhi::ClusterAccelBuildOp>(desc.op);
