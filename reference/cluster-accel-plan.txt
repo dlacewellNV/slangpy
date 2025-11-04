@@ -19,6 +19,9 @@
 - Host-side Desc `next`: allowed on host Desc only; in MVP must be null; unknown → UnsupportedExtension. Device-args never include `next`.
 - Kernels write args; insert a UAV/global barrier before the build that consumes them; ensure buffer visibility for the backend.
 
+## Style points
+- Comments should be for external users/readers of the code months from now, no asides or "notes to self" about the current task
+
 ## Session checklist (tick as you go)
 - [X] Step 1: RHI headers — compile-only
   - Acceptance: headers compile; device/encoder stubs link; feature name recognized
@@ -50,7 +53,6 @@
   - Acceptance: RHI `buildClusterAccelerationStructure` no longer takes `scratch/result` parameters; backends consume buffers exclusively from the build desc
   - Update: remove scratch/result from RHI interface and implementations (OptiX, debug layer, command paths); adjust tests/examples to set buffers in desc
   - Validation: enforce required per‑mode buffers at RHI layer; meaningful errors if missing/misaligned
-  - SGL convenience: think about a small helper to compute handles padding and populate implicit desc fields (handles/output/temp) from a single buffer + arg count, to keep samples concise
 - [ ] Step 7: slang‑rhi cluster tests (build‑and‑shoot)
 -  - Acceptance: tests pass; OptiX‑only tests skip elsewhere.
 -  - Canonicalize ABI in slang‑rhi (device header + tiny host mirror), u32/u64 POD only.
