@@ -53,17 +53,26 @@
   - Acceptance: RHI `buildClusterAccelerationStructure` no longer takes `scratch/result` parameters; backends consume buffers exclusively from the build desc
   - Update: remove scratch/result from RHI interface and implementations (OptiX, debug layer, command paths); adjust tests/examples to set buffers in desc
   - Validation: enforce required per‑mode buffers at RHI layer; meaningful errors if missing/misaligned
-- [ ] Step 7: slang‑rhi cluster tests (build‑and‑shoot)
+- [X] Step 7: slang‑rhi cluster tests (build‑and‑shoot) based loosely on SGL raytracing_pipeline_clusters
 -  - Acceptance: tests pass; OptiX‑only tests skip elsewhere.
 -  - Canonicalize ABI in slang‑rhi (device header + tiny host mirror), u32/u64 POD only.
 -  - Tests:
 -    - Build‑and‑shoot: two clusters (shared indices, per‑cluster vertex base), BLASFromCLAS with 2 handles, TLAS, clusters pipeline flag; raygen writes barycentrics; assert CLAS/BLAS non‑zero and two horizontal hit bands.
 -    - Device‑args variant: write `TrianglesArgs` on device, insert global barrier, then build CLAS; verify parity with host‑filled args.
 -  - Optional: record `GetClusterID` at a known pixel.
+[- ] Step 7.5: Centralize cluster ABI headers (tests + SGL)
+ - Acceptance: shared device ABI + host mirror live in common paths; tests and SGL include from shared; build search paths updated.
+ - Actions: move `cluster_accel_abi.common.inc`/`cluster_accel_abi.slang` to `external/slang-rhi/shaders/cluster_accel/`; add host mirror to `external/slang-rhi/include/slang-rhi/cluster_accel_abi_host.h`; add shared shader dir to tests/SGL include paths; replace local includes.
 - [ ] Step 8: Templates (unstructured)
   - Acceptance: templates build path works on OptiX; outputs are device addresses (no object types)
   - Note: refactor per-op limits to a discriminated union keyed by op (mirror OptiX/Vulkan/NVAPI patterns)
-
+  - Update our "triangle strip" tests to use a single repeated cluster template, both in SGL and slang-rhi
+- [ ] Step 9: Optionally, design an interactive sample similar to the "pathtracer" sample, based on the structured cluster sample in the directory "reference/optix-cluster-example-structured/"
+  - Acceptance: sample builds and runs and looks good (confirmed by me)
+  - Result should be a procedurally animated surface - a heightfield made of many small clusters
+  - Sample will need to be simplified vs the OptiX sample
+  - we don't have the Grid cluster template path in Slang; use the "unstructured" templates from step 8.  Make an index topology for a "grid" with 8x8 cells (two tris per cell)
+  - Brainstorm other ways to simplify this.  Single template, fixed tiling of the surface, ...
 
 ## OptiX/Vulkan/DX References
 - A reference copy of OptiX headers such as optix_host.h can be found in reference/optix-include/
