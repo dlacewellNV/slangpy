@@ -60,7 +60,7 @@
      - Build‑and‑shoot: two clusters (shared indices, per‑cluster vertex base), BLASFromCLAS with 2 handles, TLAS, clusters pipeline flag; raygen writes barycentrics; assert CLAS/BLAS non‑zero and two horizontal hit bands.
      - Device‑args variant: write `TrianglesArgs` on device, insert global barrier, then build CLAS; verify parity with host‑filled args.
    - Optional: record `GetClusterID` at a known pixel.
-- [ ] Step 7.5: Centralize cluster ABI headers (tests + SGL)
+- [X] Step 7.5: Centralize cluster ABI headers (tests + SGL)
  - Acceptance: shared device ABI + host mirror live in common paths; tests and SGL include from shared; build search paths updated.
  - Actions: move `cluster_accel_abi.common.inc`/`cluster_accel_abi.slang` to `external/slang-rhi/shaders/cluster_accel/`; add host mirror to `external/slang-rhi/include/slang-rhi/cluster_accel_abi_host.h`; add shared shader dir to tests/SGL include paths; replace local includes.
  - [ ] Step 7.55: Export shader include dir via CMake (usable by SGL)

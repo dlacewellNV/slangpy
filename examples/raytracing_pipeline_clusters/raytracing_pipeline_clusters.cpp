@@ -18,12 +18,16 @@ static const std::filesystem::path EXAMPLE_DIR(SGL_EXAMPLE_DIR);
 
 using namespace sgl;
 
+#ifndef SLANG_RHI_SHADERS_DIR
+#error "SLANG_RHI_SHADERS_DIR not defined. Ensure CMake exports it from slang-rhi."
+#endif
+
 int main()
 {
     sgl::static_init();
 
-    // Add shared shader dir for cluster ABI includes
-    const std::filesystem::path SHARED_SHADERS_DIR = EXAMPLE_DIR / "../../external/slang-rhi/shaders";
+    // Add shared shader dir for cluster ABI includes (exported via CMake)
+    const std::filesystem::path SHARED_SHADERS_DIR(SLANG_RHI_SHADERS_DIR);
     ref<Device> device = Device::create({
         .type = DeviceType::cuda,
         .enable_debug_layers = true,
