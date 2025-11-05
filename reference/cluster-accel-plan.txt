@@ -54,15 +54,20 @@
   - Update: remove scratch/result from RHI interface and implementations (OptiX, debug layer, command paths); adjust tests/examples to set buffers in desc
   - Validation: enforce required per‑mode buffers at RHI layer; meaningful errors if missing/misaligned
 - [X] Step 7: slang‑rhi cluster tests (build‑and‑shoot) based loosely on SGL raytracing_pipeline_clusters
--  - Acceptance: tests pass; OptiX‑only tests skip elsewhere.
--  - Canonicalize ABI in slang‑rhi (device header + tiny host mirror), u32/u64 POD only.
--  - Tests:
--    - Build‑and‑shoot: two clusters (shared indices, per‑cluster vertex base), BLASFromCLAS with 2 handles, TLAS, clusters pipeline flag; raygen writes barycentrics; assert CLAS/BLAS non‑zero and two horizontal hit bands.
--    - Device‑args variant: write `TrianglesArgs` on device, insert global barrier, then build CLAS; verify parity with host‑filled args.
--  - Optional: record `GetClusterID` at a known pixel.
-[- ] Step 7.5: Centralize cluster ABI headers (tests + SGL)
+   - Acceptance: tests pass; OptiX‑only tests skip elsewhere.
+   - Canonicalize ABI in slang‑rhi (device header + tiny host mirror), u32/u64 POD only.
+   - Tests:
+     - Build‑and‑shoot: two clusters (shared indices, per‑cluster vertex base), BLASFromCLAS with 2 handles, TLAS, clusters pipeline flag; raygen writes barycentrics; assert CLAS/BLAS non‑zero and two horizontal hit bands.
+     - Device‑args variant: write `TrianglesArgs` on device, insert global barrier, then build CLAS; verify parity with host‑filled args.
+   - Optional: record `GetClusterID` at a known pixel.
+- [ ] Step 7.5: Centralize cluster ABI headers (tests + SGL)
  - Acceptance: shared device ABI + host mirror live in common paths; tests and SGL include from shared; build search paths updated.
  - Actions: move `cluster_accel_abi.common.inc`/`cluster_accel_abi.slang` to `external/slang-rhi/shaders/cluster_accel/`; add host mirror to `external/slang-rhi/include/slang-rhi/cluster_accel_abi_host.h`; add shared shader dir to tests/SGL include paths; replace local includes.
+ - [ ] Step 7.55: Export shader include dir via CMake (usable by SGL)
+  - Acceptance: CMake exports `SLANG_RHI_SHADERS_DIR` (or interface include dir) and SGL example/test consume it; no hardcoded relative paths in code.
+  - Actions: add an interface definition/include path in slang-rhi CMake; pass `SLANG_RHI_SHADERS_DIR` to tests/SGL; update SGL example to drop runtime path injection.
+ - [ ] Step 7.6: Cleanup and document cluster ABI bit packing
+  - Acceptance: `cluster_accel_abi.common.inc` has clarified masks/shifts (brief comments or helper enums) and consistent naming; no functional changes.
 - [ ] Step 8: Templates (unstructured)
   - Acceptance: templates build path works on OptiX; outputs are device addresses (no object types)
   - Note: refactor per-op limits to a discriminated union keyed by op (mirror OptiX/Vulkan/NVAPI patterns)

@@ -10,7 +10,7 @@
 #include "sgl/device/shader_object.h"
 #include "sgl/utils/tev.h"
 
-#include "cluster_accel_abi_host.h"
+#include <slang-rhi/cluster_accel_abi_host.h>
 
 #include <filesystem>
 
@@ -22,10 +22,12 @@ int main()
 {
     sgl::static_init();
 
+    // Add shared shader dir for cluster ABI includes
+    const std::filesystem::path SHARED_SHADERS_DIR = EXAMPLE_DIR / "../../external/slang-rhi/shaders";
     ref<Device> device = Device::create({
         .type = DeviceType::cuda,
         .enable_debug_layers = true,
-        .compiler_options = {.include_paths = {EXAMPLE_DIR}},
+        .compiler_options = {.include_paths = {EXAMPLE_DIR, SHARED_SHADERS_DIR}},
     });
 
     if (!device->has_feature(Feature::ray_tracing)) {
