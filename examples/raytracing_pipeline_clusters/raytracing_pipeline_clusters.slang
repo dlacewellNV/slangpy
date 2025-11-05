@@ -1,5 +1,5 @@
 // Device ABI for cluster args
-#include "cluster_accel_abi.slang"
+#include "cluster_accel/cluster_accel_abi.slang"
 RaytracingAccelerationStructure tlas;
 RWTexture2D<float4> render_texture;
 
