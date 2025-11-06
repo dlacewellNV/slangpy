@@ -68,11 +68,18 @@
   - Actions: add an interface definition/include path in slang-rhi CMake; pass `SLANG_RHI_SHADERS_DIR` to tests/SGL; update SGL example to drop runtime path injection.
  - [X] Step 7.6: Cleanup and document cluster ABI bit packing.  Try not to expose global constants (namespace them if nothing else).  Try to explain magic numbers.
   - Acceptance: `cluster_accel_abi.common.inc` has clarified masks/shifts (brief comments or helper enums) and consistent naming; no functional changes.
-- [ ] Step 8: Templates (unstructured)
-  - Acceptance: templates build path works on OptiX; outputs are device addresses (no object types)
-  - Note: refactor per-op limits to a discriminated union keyed by op (mirror OptiX/Vulkan/NVAPI patterns)
-  - Update our "triangle strip" tests to use a single repeated cluster template, both in SGL and slang-rhi
-- [ ] Step 9: Optionally, design an interactive sample similar to the "pathtracer" sample, based on the structured cluster sample in the directory "reference/optix-cluster-example-structured/"
+- [X] Step 8.0: refactor per-op limits to a discriminated union keyed by op (mirror OptiX/Vulkan/NVAPI patterns) if not already done in an earlier step
+  - Acceptance: slang-rhi and SGL still build, examples and tests work
+  - Also check which limits are required in which build types.  Search for comments incorrectly stating that they're optional.
+- [ ] Step 8.1: Templates (unstructured) in slang-rhi
+  - Acceptance: templates build path compiles on OptiX.  Note that outputs are device addresses (no object types), similar to CLAS build
+  - Note: refactor per-op limits to a discriminated union keyed by op (mirror OptiX/Vulkan/NVAPI patterns) if not already done in an earlier step
+- [ ] Step 9: Templates (unstructured) in SGL
+  - Acceptance: templates build path compiles via SGL on OptiX
+  - Update our raytracing_pipeline_clusters sample to use a single repeated cluster template
+- [ ] Step 10: Vulkan backend
+  - Acceptance: slang-rhi, SGL, and our cluster tests and SGL sample all build and run successfully using Vulkan backend rather than cuda
+- [ ] Step 11: Optionally, design an interactive sample similar to the "pathtracer" sample, based on the structured cluster sample in the directory "reference/optix-cluster-example-structured/"
   - Acceptance: sample builds and runs and looks good (confirmed by me)
   - Result should be a procedurally animated surface - a heightfield made of many small clusters
   - Sample will need to be simplified vs the OptiX sample

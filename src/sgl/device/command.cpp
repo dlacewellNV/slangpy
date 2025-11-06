@@ -769,16 +769,16 @@ void CommandEncoder::build_cluster_acceleration_structure(const ClusterAccelBuil
 
     // MVP: limits and inputs validation (align with OptiX requirements)
     if (desc.op == ClusterAccelBuildOp::clas_from_triangles) {
-        SGL_CHECK(desc.triangles_limits.max_arg_count > 0, "triangles_limits.max_arg_count must be > 0");
+        SGL_CHECK(desc.limits.limits_triangles.max_arg_count > 0, "limits_triangles.max_arg_count must be > 0");
         SGL_CHECK(
-            desc.triangles_limits.max_unique_sbt_index_count_per_arg > 0,
-            "triangles_limits.max_unique_sbt_index_count_per_arg must be > 0"
+            desc.limits.limits_triangles.max_unique_sbt_index_count_per_arg > 0,
+            "limits_triangles.max_unique_sbt_index_count_per_arg must be > 0"
         );
     }
     else if (desc.op == ClusterAccelBuildOp::blas_from_clas) {
-        SGL_CHECK(desc.clusters_limits.max_arg_count > 0, "clusters_limits.max_arg_count must be > 0");
-        SGL_CHECK(desc.clusters_limits.max_total_cluster_count > 0, "clusters_limits.max_total_cluster_count must be > 0");
-        SGL_CHECK(desc.clusters_limits.max_cluster_count_per_arg > 0, "clusters_limits.max_cluster_count_per_arg must be > 0");
+        SGL_CHECK(desc.limits.limits_clusters.max_arg_count > 0, "limits_clusters.max_arg_count must be > 0");
+        SGL_CHECK(desc.limits.limits_clusters.max_total_cluster_count > 0, "limits_clusters.max_total_cluster_count must be > 0");
+        SGL_CHECK(desc.limits.limits_clusters.max_cluster_count_per_arg > 0, "limits_clusters.max_cluster_count_per_arg must be > 0");
     }
     SGL_CHECK(desc.arg_count > 0, "arg_count must be > 0");
     SGL_CHECK(desc.args_stride > 0, "args_stride must be > 0");
@@ -813,15 +813,23 @@ void CommandEncoder::build_cluster_acceleration_structure(const ClusterAccelBuil
         .argCount = desc.arg_count,
         .next = nullptr,
     };
-    // Pass through optional limits
-    rhi_desc.trianglesLimits.maxArgCount = desc.triangles_limits.max_arg_count;
-    rhi_desc.trianglesLimits.maxTriangleCountPerArg = desc.triangles_limits.max_triangle_count_per_arg;
-    rhi_desc.trianglesLimits.maxVertexCountPerArg = desc.triangles_limits.max_vertex_count_per_arg;
-    rhi_desc.trianglesLimits.maxUniqueSbtIndexCountPerArg = desc.triangles_limits.max_unique_sbt_index_count_per_arg;
-    rhi_desc.trianglesLimits.positionTruncateBitCount = desc.triangles_limits.position_truncate_bit_count;
-    rhi_desc.clustersLimits.maxArgCount = desc.clusters_limits.max_arg_count;
-    rhi_desc.clustersLimits.maxTotalClusterCount = desc.clusters_limits.max_total_cluster_count;
-    rhi_desc.clustersLimits.maxClusterCountPerArg = desc.clusters_limits.max_cluster_count_per_arg;
+    // Pass through limits based on operation type
+    switch (desc.op) {
+    case ClusterAccelBuildOp::clas_from_triangles:
+    case ClusterAccelBuildOp::templates_from_triangles:
+    case ClusterAccelBuildOp::clas_from_templates:
+        rhi_desc.limits.limitsTriangles.maxArgCount = desc.limits.limits_triangles.max_arg_count;
+        rhi_desc.limits.limitsTriangles.maxTriangleCountPerArg = desc.limits.limits_triangles.max_triangle_count_per_arg;
+        rhi_desc.limits.limitsTriangles.maxVertexCountPerArg = desc.limits.limits_triangles.max_vertex_count_per_arg;
+        rhi_desc.limits.limitsTriangles.maxUniqueSbtIndexCountPerArg = desc.limits.limits_triangles.max_unique_sbt_index_count_per_arg;
+        rhi_desc.limits.limitsTriangles.positionTruncateBitCount = desc.limits.limits_triangles.position_truncate_bit_count;
+        break;
+    case ClusterAccelBuildOp::blas_from_clas:
+        rhi_desc.limits.limitsClusters.maxArgCount = desc.limits.limits_clusters.max_arg_count;
+        rhi_desc.limits.limitsClusters.maxTotalClusterCount = desc.limits.limits_clusters.max_total_cluster_count;
+        rhi_desc.limits.limitsClusters.maxClusterCountPerArg = desc.limits.limits_clusters.max_cluster_count_per_arg;
+        break;
+    }
 
     // Forward build mode (defaults to Implicit)
     switch (desc.mode) {

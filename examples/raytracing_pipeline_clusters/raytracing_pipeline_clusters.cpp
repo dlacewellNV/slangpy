@@ -129,10 +129,10 @@ int main()
     clasDesc.args_buffer = {argsBuf, 0};
     clasDesc.args_stride = sizeof(cluster_abi::TrianglesArgs);
     clasDesc.arg_count = clusterCount;
-    clasDesc.triangles_limits.max_arg_count = clusterCount;
-    clasDesc.triangles_limits.max_triangle_count_per_arg = triCount;
-    clasDesc.triangles_limits.max_vertex_count_per_arg = vertCount;
-    clasDesc.triangles_limits.max_unique_sbt_index_count_per_arg = 1;
+    clasDesc.limits.limits_triangles.max_arg_count = clusterCount;
+    clasDesc.limits.limits_triangles.max_triangle_count_per_arg = triCount;
+    clasDesc.limits.limits_triangles.max_vertex_count_per_arg = vertCount;
+    clasDesc.limits.limits_triangles.max_unique_sbt_index_count_per_arg = 1;
 
     ClusterAccelSizes clasSizes = device->get_cluster_acceleration_structure_sizes(clasDesc);
     log_info("CLAS sizes: result={} scratch={}", clasSizes.result_size, clasSizes.scratch_size);
@@ -226,9 +226,9 @@ int main()
     blasDesc.args_buffer = {blasArgsBuf, 0};
     blasDesc.args_stride = sizeof(cluster_abi::ClustersArgs);
     blasDesc.arg_count = 1;
-    blasDesc.clusters_limits.max_arg_count = 1;
-    blasDesc.clusters_limits.max_total_cluster_count = clusterCount;
-    blasDesc.clusters_limits.max_cluster_count_per_arg = clusterCount;
+    blasDesc.limits.limits_clusters.max_arg_count = 1;
+    blasDesc.limits.limits_clusters.max_total_cluster_count = clusterCount;
+    blasDesc.limits.limits_clusters.max_cluster_count_per_arg = clusterCount;
 
     ClusterAccelSizes blasSizes = device->get_cluster_acceleration_structure_sizes(blasDesc);
     log_info("BLAS sizes: result={} scratch={}", blasSizes.result_size, blasSizes.scratch_size);
