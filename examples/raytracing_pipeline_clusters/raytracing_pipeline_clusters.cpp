@@ -113,100 +113,154 @@ int main()
         .data_size = indices.size() * sizeof(uint32_t),
     });
 
-    // --- Build CLAS from triangles (implicit mode via result buffer) ---
+	// --- Build a single template from triangles, then instantiate twice (implicit mode) ---
 
-    // Device-written args buffer (UAV + build_input) for two clusters
-    constexpr uint32_t clusterCount = 2;
-    ref<Buffer> argsBuf = device->create_buffer({
-        .element_count = clusterCount,
-        .struct_size = sizeof(cluster_abi::TrianglesArgs),
-        .usage = BufferUsage::acceleration_structure_build_input | BufferUsage::unordered_access,
-        .label = "clas_tri_args_device",
-    });
+	// 1) TemplatesFromTriangles: host-filled TrianglesArgs (topology is shared)
+	// Note: For larger scenes, writing these args from a compute kernel scales better.
+	constexpr uint32_t clusterCount = 2;
+	cluster_abi::TrianglesArgs triangles_args = cluster_abi::makeTrianglesArgs(
+		/*clusterId*/0,
+		/*triangleCount*/triCount,
+		/*vertexCount*/vertCount,
+		/*indexBuffer*/(uint64_t)index_buffer->device_address(),
+		/*vertexBuffer*/(uint64_t)vertex_buffer->device_address(),
+		/*vertexStrideBytes*/(uint32_t)sizeof(Float3),
+		/*indexFormat*/4 // 32-bit indices
+	);
+	ref<Buffer> templates_triangles_args = device->create_buffer({
+		.usage = BufferUsage::acceleration_structure_build_input,
+		.label = "templates_from_triangles_args",
+		.data = &triangles_args,
+		.data_size = sizeof(triangles_args),
+	});
 
-    ClusterAccelBuildDesc clasDesc{};
-    clasDesc.op = ClusterAccelBuildOp::clas_from_triangles;
-    clasDesc.args_buffer = {argsBuf, 0};
-    clasDesc.args_stride = sizeof(cluster_abi::TrianglesArgs);
-    clasDesc.arg_count = clusterCount;
-    clasDesc.limits.limits_triangles.max_arg_count = clusterCount;
-    clasDesc.limits.limits_triangles.max_triangle_count_per_arg = triCount;
-    clasDesc.limits.limits_triangles.max_vertex_count_per_arg = vertCount;
-    clasDesc.limits.limits_triangles.max_unique_sbt_index_count_per_arg = 1;
+	ClusterAccelBuildDesc templates_desc{};
+	templates_desc.op = ClusterAccelBuildOp::templates_from_triangles;
+	templates_desc.args_buffer = {templates_triangles_args, 0};
+	templates_desc.args_stride = sizeof(cluster_abi::TrianglesArgs);
+	templates_desc.arg_count = 1;
+	templates_desc.limits.limits_triangles.max_arg_count = 1;
+	templates_desc.limits.limits_triangles.max_triangle_count_per_arg = triCount;
+	templates_desc.limits.limits_triangles.max_vertex_count_per_arg = vertCount;
+	templates_desc.limits.limits_triangles.max_unique_sbt_index_count_per_arg = 1;
 
-    ClusterAccelSizes clasSizes = device->get_cluster_acceleration_structure_sizes(clasDesc);
-    log_info("CLAS sizes: result={} scratch={}", clasSizes.result_size, clasSizes.scratch_size);
+	ClusterAccelSizes template_sizes = device->get_cluster_acceleration_structure_sizes(templates_desc);
+	log_info("Template sizes: result={} scratch={}", template_sizes.result_size, template_sizes.scratch_size);
 
-    // Allocate handles buffer (8 bytes per cluster) and result buffer for CLAS data
-    ref<Buffer> clasHandles = device->create_buffer({
-        .size = uint64_t(clusterCount) * 8u,
-        .usage = BufferUsage::unordered_access,
-        .label = "clas_handles",
-    });
-    ref<Buffer> clasData = device->create_buffer({
-        .size = clasSizes.result_size,
-        .usage = BufferUsage::acceleration_structure,
-        .label = "clas_data",
-    });
-    ref<Buffer> clasScratch = device->create_buffer({
-        .size = clasSizes.scratch_size,
-        .usage = BufferUsage::unordered_access,
-        .label = "clas_scratch",
-    });
+	ref<Buffer> template_handles = device->create_buffer({
+		.size = 8, // one handle
+		.usage = BufferUsage::unordered_access,
+		.label = "template_handles",
+	});
+	ref<Buffer> template_data = device->create_buffer({
+		.size = template_sizes.result_size,
+		.usage = BufferUsage::acceleration_structure,
+		.label = "template_data",
+	});
+	ref<Buffer> template_scratch = device->create_buffer({
+		.size = template_sizes.scratch_size,
+		.usage = BufferUsage::unordered_access,
+		.label = "template_scratch",
+	});
 
-    // Run compute to write args, then barrier, then build CLAS in the same command buffer
-    {
-        auto enc = device->create_command_encoder();
-        // Compute: write args
-        auto cpass = enc->begin_compute_pass();
-        auto cprog = device->load_program("raytracing_pipeline_clusters.slang", {"write_tri_args"});
-        auto cpipeline = device->create_compute_pipeline({.program = cprog});
-        ShaderObject* croot = cpass->bind_pipeline(cpipeline);
-        ShaderCursor ccursor(croot);
-        {
-            // Helper lambdas for setting scalar parameters via raw data
-            auto set_u64 = [&](const char* name, uint64_t v) { ccursor[name].set_data(&v, sizeof(v)); };
-            auto set_u32 = [&](const char* name, uint32_t v) { ccursor[name].set_data(&v, sizeof(v)); };
-            ccursor["g_tri_args"] = argsBuf;
-            set_u64("g_index_buffer", index_buffer->device_address());
-            set_u64("g_vertex_buffer", vertex_buffer->device_address());
-            set_u32("g_vertex_stride_bytes", (uint32_t)sizeof(Float3));
-            set_u32("g_triangle_count", triCount);
-            set_u32("g_vertex_count", vertCount);
-            // Each cluster uses the same index topology but different vertices.
-            // Second cluster starts at vertex index 10 (vertCount) in the vertex buffer.
-            set_u32("g_vertex_offset_elems_per_cluster", vertCount);
-            set_u32("g_cluster_count", clusterCount);
-        }
-        cpass->dispatch(uint3{clusterCount,1,1});
-        cpass->end();
+	{
+		auto enc = device->create_command_encoder();
 
-        // Ensure visibility of UAV writes
-        enc->global_barrier();
+		// Build the template (implicit mode)
+		templates_desc.mode = ClusterAccelBuildDesc::BuildMode::implicit;
+		templates_desc.implicit.output_handles_buffer = template_handles->device_address();
+		templates_desc.implicit.output_handles_stride_in_bytes = 0; // 0 -> 8
+		templates_desc.implicit.output_buffer = template_data->device_address();
+		templates_desc.implicit.output_buffer_size_in_bytes = template_data->size();
+		templates_desc.implicit.temp_buffer = template_scratch->device_address();
+		templates_desc.implicit.temp_buffer_size_in_bytes = template_scratch->size();
 
-        // Build CLAS (implicit mode) — set required buffers in desc
-        clasDesc.mode = ClusterAccelBuildDesc::BuildMode::implicit;
-        clasDesc.implicit.output_handles_buffer = clasHandles->device_address();
-        clasDesc.implicit.output_handles_stride_in_bytes = 0; // 0 -> 8
-        clasDesc.implicit.output_buffer = clasData->device_address();
-        clasDesc.implicit.output_buffer_size_in_bytes = clasData->size();
-        clasDesc.implicit.temp_buffer = clasScratch->device_address();
-        clasDesc.implicit.temp_buffer_size_in_bytes = clasScratch->size();
+		enc->build_cluster_acceleration_structure(templates_desc);
+		device->submit_command_buffer(enc->finish());
+	}
 
-        enc->build_cluster_acceleration_structure(clasDesc);
-        device->submit_command_buffer(enc->finish());
-    }
+	uint64_t template_handle = 0;
+	device->read_buffer_data(template_handles, &template_handle, sizeof(template_handle), 0);
+	if (template_handle == 0) {
+		log_error("TemplatesFromTriangles failed: template handle is zero");
+		return 1;
+	}
 
-    // Verify CLAS build succeeded by checking handles are non-zero.
-    // In implicit mode, the driver writes device addresses into the handles buffer.
-    // Zero handles indicate the build failed or the buffer wasn't written.
-    uint64_t handles[2] = {0, 0};
-    device->read_buffer_data(clasHandles, handles, sizeof(handles), 0);
-    log_info("CLAS handles[0] = 0x{:016x}, CLAS handles[1] = 0x{:016x}", handles[0], handles[1]);
-    if (handles[0] == 0 || handles[1] == 0) {
-        log_error("CLAS build failed: one or more handles are zero (driver did not write valid addresses)");
-        return 1;
-    }
+	// 2) CLASFromTemplates: instantiate the template twice with per-instance vertex bases
+	cluster_abi::TemplatesArgs template_instantiation_args[clusterCount] = {};
+	uint64_t vertex_base = (uint64_t)vertex_buffer->device_address();
+	uint32_t vertex_stride = (uint32_t)sizeof(Float3);
+	// Note: For many clusters we could populate these args with a compute kernel.
+	// For two clusters, host-side filling is sufficient and simpler.
+	for (uint32_t i = 0; i < clusterCount; ++i) {
+		uint64_t vertex_addr = vertex_base + uint64_t(i) * uint64_t(vertCount) * uint64_t(vertex_stride);
+		template_instantiation_args[i] = cluster_abi::makeTemplatesArgs(
+			/*clusterTemplate*/template_handle,
+			/*vertexBuffer*/vertex_addr,
+			/*vertexStrideInBytes*/vertex_stride,
+			/*clusterIdOffset*/i,
+			/*sbtIndexOffset*/0);
+	}
+	ref<Buffer> clas_from_templates_args = device->create_buffer({
+		.usage = BufferUsage::acceleration_structure_build_input,
+		.label = "clas_from_templates_args",
+		.data = &template_instantiation_args[0],
+		.data_size = sizeof(template_instantiation_args),
+	});
+
+	ClusterAccelBuildDesc clas_from_templates_desc{};
+	clas_from_templates_desc.op = ClusterAccelBuildOp::clas_from_templates;
+	clas_from_templates_desc.args_buffer = {clas_from_templates_args, 0};
+	clas_from_templates_desc.args_stride = sizeof(cluster_abi::TemplatesArgs);
+	clas_from_templates_desc.arg_count = clusterCount;
+	// Reuse triangle limits per API
+	clas_from_templates_desc.limits.limits_triangles.max_arg_count = clusterCount;
+	clas_from_templates_desc.limits.limits_triangles.max_triangle_count_per_arg = triCount;
+	clas_from_templates_desc.limits.limits_triangles.max_vertex_count_per_arg = vertCount;
+	clas_from_templates_desc.limits.limits_triangles.max_unique_sbt_index_count_per_arg = 1;
+
+	ClusterAccelSizes clasSizes = device->get_cluster_acceleration_structure_sizes(clas_from_templates_desc);
+	log_info("CLAS sizes: result={} scratch={}", clasSizes.result_size, clasSizes.scratch_size);
+
+	// Allocate handles buffer (8 bytes per cluster) and result buffer for CLAS data
+	ref<Buffer> clasHandles = device->create_buffer({
+		.size = uint64_t(clusterCount) * 8u,
+		.usage = BufferUsage::unordered_access,
+		.label = "clas_handles",
+	});
+	ref<Buffer> clasData = device->create_buffer({
+		.size = clasSizes.result_size,
+		.usage = BufferUsage::acceleration_structure,
+		.label = "clas_data",
+	});
+	ref<Buffer> clasScratch = device->create_buffer({
+		.size = clasSizes.scratch_size,
+		.usage = BufferUsage::unordered_access,
+		.label = "clas_scratch",
+	});
+
+	{
+		auto enc = device->create_command_encoder();
+		clas_from_templates_desc.mode = ClusterAccelBuildDesc::BuildMode::implicit;
+		clas_from_templates_desc.implicit.output_handles_buffer = clasHandles->device_address();
+		clas_from_templates_desc.implicit.output_handles_stride_in_bytes = 0; // 0 -> 8
+		clas_from_templates_desc.implicit.output_buffer = clasData->device_address();
+		clas_from_templates_desc.implicit.output_buffer_size_in_bytes = clasData->size();
+		clas_from_templates_desc.implicit.temp_buffer = clasScratch->device_address();
+		clas_from_templates_desc.implicit.temp_buffer_size_in_bytes = clasScratch->size();
+
+		enc->build_cluster_acceleration_structure(clas_from_templates_desc);
+		device->submit_command_buffer(enc->finish());
+	}
+
+	// Verify CLAS build succeeded by checking handles are non-zero.
+	uint64_t handles[2] = {0, 0};
+	device->read_buffer_data(clasHandles, handles, sizeof(handles), 0);
+	log_info("CLAS handles[0] = 0x{:016x}, CLAS handles[1] = 0x{:016x}", handles[0], handles[1]);
+	if (handles[0] == 0 || handles[1] == 0) {
+		log_error("CLAS build failed: one or more handles are zero (driver did not write valid addresses)");
+		return 1;
+	}
 
     // --- Build BLAS from CLAS handles ---
     cluster_abi::ClustersArgs clArgs = cluster_abi::makeClustersArgs(
