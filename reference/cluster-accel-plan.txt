@@ -63,10 +63,10 @@
 - [X] Step 7.5: Centralize cluster ABI headers (tests + SGL)
  - Acceptance: shared device ABI + host mirror live in common paths; tests and SGL include from shared; build search paths updated.
  - Actions: move `cluster_accel_abi.common.inc`/`cluster_accel_abi.slang` to `external/slang-rhi/shaders/cluster_accel/`; add host mirror to `external/slang-rhi/include/slang-rhi/cluster_accel_abi_host.h`; add shared shader dir to tests/SGL include paths; replace local includes.
- - [ ] Step 7.55: Export shader include dir via CMake (usable by SGL)
+ - [X] Step 7.55: Export shader include dir via CMake (usable by SGL)
   - Acceptance: CMake exports `SLANG_RHI_SHADERS_DIR` (or interface include dir) and SGL example/test consume it; no hardcoded relative paths in code.
   - Actions: add an interface definition/include path in slang-rhi CMake; pass `SLANG_RHI_SHADERS_DIR` to tests/SGL; update SGL example to drop runtime path injection.
- - [ ] Step 7.6: Cleanup and document cluster ABI bit packing
+ - [X] Step 7.6: Cleanup and document cluster ABI bit packing.  Try not to expose global constants (namespace them if nothing else).  Try to explain magic numbers.
   - Acceptance: `cluster_accel_abi.common.inc` has clarified masks/shifts (brief comments or helper enums) and consistent naming; no functional changes.
 - [ ] Step 8: Templates (unstructured)
   - Acceptance: templates build path works on OptiX; outputs are device addresses (no object types)

@@ -22,11 +22,24 @@ using namespace sgl;
 #error "SLANG_RHI_SHADERS_DIR not defined. Ensure CMake exports it from slang-rhi."
 #endif
 
+// This example demonstrates cluster acceleration structures:
+//
+// 1. Create geometry for two separate triangle strips (sharing index topology)
+// 2. Build 2 CLAS (cluster acceleration structures) from triangles using device-written args
+// 3. Build 1 BLAS from the 2 CLAS handles
+// 4. Build TLAS from the BLAS
+// 5. Render using a ray tracing pipeline with clusters enabled
+//
+// Key features demonstrated:
+// - Device-written CLAS args (compute shader writes args, barrier, then build)
+// - Implicit build mode (driver allocates within result buffer, returns handles)
+// - Per-cluster vertex base offsets (shared index buffer, different vertex ranges)
+// - Handle-based BLAS construction from CLAS
+
 int main()
 {
     sgl::static_init();
 
-    // Add shared shader dir for cluster ABI includes (exported via CMake)
     const std::filesystem::path SHARED_SHADERS_DIR(SLANG_RHI_SHADERS_DIR);
     ref<Device> device = Device::create({
         .type = DeviceType::cuda,
@@ -44,15 +57,14 @@ int main()
         return 0;
     }
 
-
     // --- Geometry: 1x4 grid (8 triangles per strip) ---
     struct Float3 { float x, y, z; };
     constexpr uint32_t kGridW = 4;
     constexpr uint32_t kGridH = 1;
-    constexpr uint32_t triCount = kGridW * kGridH * 2;          // 8
-    constexpr uint32_t vertW = kGridW + 1;                       // 5
-    constexpr uint32_t vertH = kGridH + 1;                       // 2
-    constexpr uint32_t vertCount = vertW * vertH;                // 10
+    constexpr uint32_t triCount = kGridW * kGridH * 2;
+    constexpr uint32_t vertW = kGridW + 1;
+    constexpr uint32_t vertH = kGridH + 1;
+    constexpr uint32_t vertCount = vertW * vertH;
 
     std::vector<Float3> vertices;
     vertices.reserve(vertCount);
@@ -123,11 +135,9 @@ int main()
     clasDesc.triangles_limits.max_unique_sbt_index_count_per_arg = 1;
 
     ClusterAccelSizes clasSizes = device->get_cluster_acceleration_structure_sizes(clasDesc);
-    log_info("CLAS sizes: result=%llu scratch=%llu", (unsigned long long)clasSizes.result_size,
-             (unsigned long long)clasSizes.scratch_size);
+    log_info("CLAS sizes: result={} scratch={}", clasSizes.result_size, clasSizes.scratch_size);
 
-    // Separate buffers: one for handles (argCount * 8), one for CLAS data (clasSizes.result_size)
-    // Note: in a real application these two buffers could be combined into one allocation
+    // Allocate handles buffer (8 bytes per cluster) and result buffer for CLAS data
     ref<Buffer> clasHandles = device->create_buffer({
         .size = uint64_t(clusterCount) * 8u,
         .usage = BufferUsage::unordered_access,
@@ -154,6 +164,7 @@ int main()
         ShaderObject* croot = cpass->bind_pipeline(cpipeline);
         ShaderCursor ccursor(croot);
         {
+            // Helper lambdas for setting scalar parameters via raw data
             auto set_u64 = [&](const char* name, uint64_t v) { ccursor[name].set_data(&v, sizeof(v)); };
             auto set_u32 = [&](const char* name, uint32_t v) { ccursor[name].set_data(&v, sizeof(v)); };
             ccursor["g_tri_args"] = argsBuf;
@@ -162,6 +173,8 @@ int main()
             set_u32("g_vertex_stride_bytes", (uint32_t)sizeof(Float3));
             set_u32("g_triangle_count", triCount);
             set_u32("g_vertex_count", vertCount);
+            // Each cluster uses the same index topology but different vertices.
+            // Second cluster starts at vertex index 10 (vertCount) in the vertex buffer.
             set_u32("g_vertex_offset_elems_per_cluster", vertCount);
             set_u32("g_cluster_count", clusterCount);
         }
@@ -184,12 +197,14 @@ int main()
         device->submit_command_buffer(enc->finish());
     }
 
-    // Sanity check
+    // Verify CLAS build succeeded by checking handles are non-zero.
+    // In implicit mode, the driver writes device addresses into the handles buffer.
+    // Zero handles indicate the build failed or the buffer wasn't written.
     uint64_t handles[2] = {0, 0};
     device->read_buffer_data(clasHandles, handles, sizeof(handles), 0);
-    log_info("CLAS handles[0] = {}, CLAS handles[1] = {}", handles[0], handles[1]);
+    log_info("CLAS handles[0] = 0x{:016x}, CLAS handles[1] = 0x{:016x}", handles[0], handles[1]);
     if (handles[0] == 0 || handles[1] == 0) {
-        log_error("CLAS handles are zero. This should not happen.");
+        log_error("CLAS build failed: one or more handles are zero (driver did not write valid addresses)");
         return 1;
     }
 
@@ -216,9 +231,9 @@ int main()
     blasDesc.clusters_limits.max_cluster_count_per_arg = clusterCount;
 
     ClusterAccelSizes blasSizes = device->get_cluster_acceleration_structure_sizes(blasDesc);
-    log_info("BLAS sizes: result=%llu scratch=%llu", (unsigned long long)blasSizes.result_size,
-             (unsigned long long)blasSizes.scratch_size);
-    
+    log_info("BLAS sizes: result={} scratch={}", blasSizes.result_size, blasSizes.scratch_size);
+
+    // Same buffer pattern: handles, acceleration structure data, and scratch
     ref<Buffer> blasHandles = device->create_buffer({
         .size = 8, // one handle
         .usage = BufferUsage::unordered_access,
@@ -250,10 +265,14 @@ int main()
         device->submit_command_buffer(enc->finish());
     }
 
-    // Sanity check BLAS handle
-    uint64_t blasFirst = 0;
-    device->read_buffer_data(blasHandles, &blasFirst, sizeof(blasFirst), 0);
-    log_info("BLAS first qword = {}", blasFirst);
+    // Verify BLAS build succeeded
+    uint64_t blasHandle = 0;
+    device->read_buffer_data(blasHandles, &blasHandle, sizeof(blasHandle), 0);
+    log_info("BLAS handle = 0x{:016x}", blasHandle);
+    if (blasHandle == 0) {
+        log_error("BLAS build failed: handle is zero (driver did not write valid address)");
+        return 1;
+    }
 
     // --- TLAS from BLAS ---
     ref<AccelerationStructureInstanceList> instance_list = device->create_acceleration_structure_instance_list(1);
@@ -263,7 +282,7 @@ int main()
         .instance_mask = 0xff,
         .instance_contribution_to_hit_group_index = 0,
         .flags = AccelerationStructureInstanceFlags::none,
-        .acceleration_structure = AccelerationStructureHandle{blasFirst},
+        .acceleration_structure = AccelerationStructureHandle{blasHandle},
     });
 
     AccelerationStructureBuildDesc tlas_build_desc{
