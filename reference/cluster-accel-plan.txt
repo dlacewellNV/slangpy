@@ -71,12 +71,20 @@
 - [X] Step 8.0: refactor per-op limits to a discriminated union keyed by op (mirror OptiX/Vulkan/NVAPI patterns) if not already done in an earlier step
   - Acceptance: slang-rhi and SGL still build, examples and tests work
   - Also check which limits are required in which build types.  Search for comments incorrectly stating that they're optional.
-- [ ] Step 8.1: Templates (unstructured) in slang-rhi
+- [X] Step 8.1: Templates (unstructured) in slang-rhi
   - Acceptance: templates build path compiles on OptiX.  Note that outputs are device addresses (no object types), similar to CLAS build
-  - Note: refactor per-op limits to a discriminated union keyed by op (mirror OptiX/Vulkan/NVAPI patterns) if not already done in an earlier step
-- [ ] Step 9: Templates (unstructured) in SGL
+  [X] Step 8.2: Update the ray-shooting cluster test in slang-rhi-tests to use a template and instance it twice for the two strips
+  - Acceptance: cluster tests build and pass
+  - Modify the existing ray shooting test in place
+  - Add or modify compute kernels to fill in Args for the TemplatesFromTriangles and CLASFromTemplates operations
+  - TemplatesFromTriangles should be able to use the same Args type from the ABI as CLASFromTriangles did
+  - If it's easier, could also fill in Args on the host temporarily to get it working
+- [X] Step 9: Templates (unstructured) in SGL
   - Acceptance: templates build path compiles via SGL on OptiX
   - Update our raytracing_pipeline_clusters sample to use a single repeated cluster template
+- [ ] Step 9.5: Revisit packed field names in cluster ABI
+  - Acceptance: slang-rhi and SGL still build
+  - Current ABI has names like "pack0" that aren't very educational, consider better versions
 - [ ] Step 10: Vulkan backend
   - Acceptance: slang-rhi, SGL, and our cluster tests and SGL sample all build and run successfully using Vulkan backend rather than cuda
 - [ ] Step 11: Optionally, design an interactive sample similar to the "pathtracer" sample, based on the structured cluster sample in the directory "reference/optix-cluster-example-structured/"
