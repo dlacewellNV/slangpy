@@ -82,11 +82,10 @@
 - [X] Step 9: Templates (unstructured) in SGL
   - Acceptance: templates build path compiles via SGL on OptiX
   - Update our raytracing_pipeline_clusters sample to use a single repeated cluster template
-- [ ] Step 9.5: Revisit packed field names in cluster ABI
-  - Acceptance: slang-rhi and SGL still build
-  - Current ABI has names like "pack0" that aren't very educational, consider better versions
+
 - [ ] Step 10: Vulkan backend
   - Acceptance: slang-rhi, SGL, and our cluster tests and SGL sample all build and run successfully using Vulkan backend rather than cuda
+  - TODO: flesh out the plan for this, it will require sub-steps
 - [ ] Step 11: Optionally, design an interactive sample similar to the "pathtracer" sample, based on the structured cluster sample in the directory "reference/optix-cluster-example-structured/"
   - Acceptance: sample builds and runs and looks good (confirmed by me)
   - Result should be a procedurally animated surface - a heightfield made of many small clusters
