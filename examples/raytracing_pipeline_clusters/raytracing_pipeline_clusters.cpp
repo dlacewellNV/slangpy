@@ -100,13 +100,13 @@ int main()
         vertices.push_back(vtx);
     }
 
-    ref<Buffer> vertex_buffer = device->create_buffer({
+    ref<Buffer> vertexBuffer = device->create_buffer({
         .usage = BufferUsage::acceleration_structure_build_input,
         .label = "vertex_buffer",
         .data = vertices.data(),
         .data_size = vertices.size() * sizeof(Float3),
     });
-    ref<Buffer> index_buffer = device->create_buffer({
+    ref<Buffer> indexBuffer = device->create_buffer({
         .usage = BufferUsage::acceleration_structure_build_input,
         .label = "index_buffer",
         .data = indices.data(),
@@ -116,49 +116,50 @@ int main()
 	// --- Build a single template from triangles, then instantiate twice (implicit mode) ---
 
 	// 1) TemplatesFromTriangles: host-filled TrianglesArgs (topology is shared)
-	// Note: For larger scenes, writing these args from a compute kernel scales better.
+	// Note: For simplicity, we fill args on the host. For device-driven scenes with many
+	// clusters, use a compute shader to write args (see slang-rhi cluster tests).
 	constexpr uint32_t clusterCount = 2;
-	cluster_abi::TrianglesArgs triangles_args = cluster_abi::makeTrianglesArgs(
+	cluster_abi::TrianglesArgs trianglesArgs = cluster_abi::makeTrianglesArgs(
 		/*clusterId*/0,
 		/*triangleCount*/triCount,
 		/*vertexCount*/vertCount,
-		/*indexBuffer*/(uint64_t)index_buffer->device_address(),
-		/*vertexBuffer*/(uint64_t)vertex_buffer->device_address(),
+		/*indexBuffer*/(uint64_t)indexBuffer->device_address(),
+		/*vertexBuffer*/(uint64_t)vertexBuffer->device_address(),
 		/*vertexStrideBytes*/(uint32_t)sizeof(Float3),
 		/*indexFormat*/4 // 32-bit indices
 	);
-	ref<Buffer> templates_triangles_args = device->create_buffer({
+	ref<Buffer> templatesTrianglesArgs = device->create_buffer({
 		.usage = BufferUsage::acceleration_structure_build_input,
 		.label = "templates_from_triangles_args",
-		.data = &triangles_args,
-		.data_size = sizeof(triangles_args),
+		.data = &trianglesArgs,
+		.data_size = sizeof(trianglesArgs),
 	});
 
-	ClusterAccelBuildDesc templates_desc{};
-	templates_desc.op = ClusterAccelBuildOp::templates_from_triangles;
-	templates_desc.args_buffer = {templates_triangles_args, 0};
-	templates_desc.args_stride = sizeof(cluster_abi::TrianglesArgs);
-	templates_desc.arg_count = 1;
-	templates_desc.limits.limits_triangles.max_arg_count = 1;
-	templates_desc.limits.limits_triangles.max_triangle_count_per_arg = triCount;
-	templates_desc.limits.limits_triangles.max_vertex_count_per_arg = vertCount;
-	templates_desc.limits.limits_triangles.max_unique_sbt_index_count_per_arg = 1;
+	ClusterAccelBuildDesc templatesDesc{};
+	templatesDesc.op = ClusterAccelBuildOp::templates_from_triangles;
+	templatesDesc.args_buffer = {templatesTrianglesArgs, 0};
+	templatesDesc.args_stride = sizeof(cluster_abi::TrianglesArgs);
+	templatesDesc.arg_count = 1;
+	templatesDesc.limits.limits_triangles.max_arg_count = 1;
+	templatesDesc.limits.limits_triangles.max_triangle_count_per_arg = triCount;
+	templatesDesc.limits.limits_triangles.max_vertex_count_per_arg = vertCount;
+	templatesDesc.limits.limits_triangles.max_unique_sbt_index_count_per_arg = 1;
 
-	ClusterAccelSizes template_sizes = device->get_cluster_acceleration_structure_sizes(templates_desc);
-	log_info("Template sizes: result={} scratch={}", template_sizes.result_size, template_sizes.scratch_size);
+	ClusterAccelSizes templateSizes = device->get_cluster_acceleration_structure_sizes(templatesDesc);
+	log_info("Template sizes: result={} scratch={}", templateSizes.result_size, templateSizes.scratch_size);
 
-	ref<Buffer> template_handles = device->create_buffer({
+	ref<Buffer> templateHandles = device->create_buffer({
 		.size = 8, // one handle
 		.usage = BufferUsage::unordered_access,
 		.label = "template_handles",
 	});
-	ref<Buffer> template_data = device->create_buffer({
-		.size = template_sizes.result_size,
+	ref<Buffer> templateData = device->create_buffer({
+		.size = templateSizes.result_size,
 		.usage = BufferUsage::acceleration_structure,
 		.label = "template_data",
 	});
-	ref<Buffer> template_scratch = device->create_buffer({
-		.size = template_sizes.scratch_size,
+	ref<Buffer> templateScratch = device->create_buffer({
+		.size = templateSizes.scratch_size,
 		.usage = BufferUsage::unordered_access,
 		.label = "template_scratch",
 	});
@@ -167,59 +168,57 @@ int main()
 		auto enc = device->create_command_encoder();
 
 		// Build the template (implicit mode)
-		templates_desc.mode = ClusterAccelBuildDesc::BuildMode::implicit;
-		templates_desc.implicit.output_handles_buffer = template_handles->device_address();
-		templates_desc.implicit.output_handles_stride_in_bytes = 0; // 0 -> 8
-		templates_desc.implicit.output_buffer = template_data->device_address();
-		templates_desc.implicit.output_buffer_size_in_bytes = template_data->size();
-		templates_desc.implicit.temp_buffer = template_scratch->device_address();
-		templates_desc.implicit.temp_buffer_size_in_bytes = template_scratch->size();
+		templatesDesc.mode = ClusterAccelBuildDesc::BuildMode::implicit;
+		templatesDesc.implicit.output_handles_buffer = templateHandles->device_address();
+		templatesDesc.implicit.output_handles_stride_in_bytes = 0; // 0 -> 8
+		templatesDesc.implicit.output_buffer = templateData->device_address();
+		templatesDesc.implicit.output_buffer_size_in_bytes = templateData->size();
+		templatesDesc.implicit.temp_buffer = templateScratch->device_address();
+		templatesDesc.implicit.temp_buffer_size_in_bytes = templateScratch->size();
 
-		enc->build_cluster_acceleration_structure(templates_desc);
+		enc->build_cluster_acceleration_structure(templatesDesc);
 		device->submit_command_buffer(enc->finish());
 	}
 
-	uint64_t template_handle = 0;
-	device->read_buffer_data(template_handles, &template_handle, sizeof(template_handle), 0);
-	if (template_handle == 0) {
+	uint64_t templateHandle = 0;
+	device->read_buffer_data(templateHandles, &templateHandle, sizeof(templateHandle), 0);
+	if (templateHandle == 0) {
 		log_error("TemplatesFromTriangles failed: template handle is zero");
 		return 1;
 	}
 
 	// 2) CLASFromTemplates: instantiate the template twice with per-instance vertex bases
-	cluster_abi::TemplatesArgs template_instantiation_args[clusterCount] = {};
-	uint64_t vertex_base = (uint64_t)vertex_buffer->device_address();
-	uint32_t vertex_stride = (uint32_t)sizeof(Float3);
-	// Note: For many clusters we could populate these args with a compute kernel.
-	// For two clusters, host-side filling is sufficient and simpler.
+	cluster_abi::TemplatesArgs templateInstantiationArgs[clusterCount] = {};
+	uint64_t vertexBase = (uint64_t)vertexBuffer->device_address();
+	uint32_t vertexStride = (uint32_t)sizeof(Float3);
 	for (uint32_t i = 0; i < clusterCount; ++i) {
-		uint64_t vertex_addr = vertex_base + uint64_t(i) * uint64_t(vertCount) * uint64_t(vertex_stride);
-		template_instantiation_args[i] = cluster_abi::makeTemplatesArgs(
-			/*clusterTemplate*/template_handle,
-			/*vertexBuffer*/vertex_addr,
-			/*vertexStrideInBytes*/vertex_stride,
+		uint64_t vertexAddr = vertexBase + uint64_t(i) * uint64_t(vertCount) * uint64_t(vertexStride);
+		templateInstantiationArgs[i] = cluster_abi::makeTemplatesArgs(
+			/*clusterTemplate*/templateHandle,
+			/*vertexBuffer*/vertexAddr,
+			/*vertexStrideInBytes*/vertexStride,
 			/*clusterIdOffset*/i,
 			/*sbtIndexOffset*/0);
 	}
-	ref<Buffer> clas_from_templates_args = device->create_buffer({
+	ref<Buffer> clasFromTemplatesArgs = device->create_buffer({
 		.usage = BufferUsage::acceleration_structure_build_input,
 		.label = "clas_from_templates_args",
-		.data = &template_instantiation_args[0],
-		.data_size = sizeof(template_instantiation_args),
+		.data = &templateInstantiationArgs[0],
+		.data_size = sizeof(templateInstantiationArgs),
 	});
 
-	ClusterAccelBuildDesc clas_from_templates_desc{};
-	clas_from_templates_desc.op = ClusterAccelBuildOp::clas_from_templates;
-	clas_from_templates_desc.args_buffer = {clas_from_templates_args, 0};
-	clas_from_templates_desc.args_stride = sizeof(cluster_abi::TemplatesArgs);
-	clas_from_templates_desc.arg_count = clusterCount;
+	ClusterAccelBuildDesc clasFromTemplatesDesc{};
+	clasFromTemplatesDesc.op = ClusterAccelBuildOp::clas_from_templates;
+	clasFromTemplatesDesc.args_buffer = {clasFromTemplatesArgs, 0};
+	clasFromTemplatesDesc.args_stride = sizeof(cluster_abi::TemplatesArgs);
+	clasFromTemplatesDesc.arg_count = clusterCount;
 	// Reuse triangle limits per API
-	clas_from_templates_desc.limits.limits_triangles.max_arg_count = clusterCount;
-	clas_from_templates_desc.limits.limits_triangles.max_triangle_count_per_arg = triCount;
-	clas_from_templates_desc.limits.limits_triangles.max_vertex_count_per_arg = vertCount;
-	clas_from_templates_desc.limits.limits_triangles.max_unique_sbt_index_count_per_arg = 1;
+	clasFromTemplatesDesc.limits.limits_triangles.max_arg_count = clusterCount;
+	clasFromTemplatesDesc.limits.limits_triangles.max_triangle_count_per_arg = triCount;
+	clasFromTemplatesDesc.limits.limits_triangles.max_vertex_count_per_arg = vertCount;
+	clasFromTemplatesDesc.limits.limits_triangles.max_unique_sbt_index_count_per_arg = 1;
 
-	ClusterAccelSizes clasSizes = device->get_cluster_acceleration_structure_sizes(clas_from_templates_desc);
+	ClusterAccelSizes clasSizes = device->get_cluster_acceleration_structure_sizes(clasFromTemplatesDesc);
 	log_info("CLAS sizes: result={} scratch={}", clasSizes.result_size, clasSizes.scratch_size);
 
 	// Allocate handles buffer (8 bytes per cluster) and result buffer for CLAS data
@@ -241,15 +240,15 @@ int main()
 
 	{
 		auto enc = device->create_command_encoder();
-		clas_from_templates_desc.mode = ClusterAccelBuildDesc::BuildMode::implicit;
-		clas_from_templates_desc.implicit.output_handles_buffer = clasHandles->device_address();
-		clas_from_templates_desc.implicit.output_handles_stride_in_bytes = 0; // 0 -> 8
-		clas_from_templates_desc.implicit.output_buffer = clasData->device_address();
-		clas_from_templates_desc.implicit.output_buffer_size_in_bytes = clasData->size();
-		clas_from_templates_desc.implicit.temp_buffer = clasScratch->device_address();
-		clas_from_templates_desc.implicit.temp_buffer_size_in_bytes = clasScratch->size();
+		clasFromTemplatesDesc.mode = ClusterAccelBuildDesc::BuildMode::implicit;
+		clasFromTemplatesDesc.implicit.output_handles_buffer = clasHandles->device_address();
+		clasFromTemplatesDesc.implicit.output_handles_stride_in_bytes = 0; // 0 -> 8
+		clasFromTemplatesDesc.implicit.output_buffer = clasData->device_address();
+		clasFromTemplatesDesc.implicit.output_buffer_size_in_bytes = clasData->size();
+		clasFromTemplatesDesc.implicit.temp_buffer = clasScratch->device_address();
+		clasFromTemplatesDesc.implicit.temp_buffer_size_in_bytes = clasScratch->size();
 
-		enc->build_cluster_acceleration_structure(clas_from_templates_desc);
+		enc->build_cluster_acceleration_structure(clasFromTemplatesDesc);
 		device->submit_command_buffer(enc->finish());
 	}
 
@@ -329,8 +328,8 @@ int main()
     }
 
     // --- TLAS from BLAS ---
-    ref<AccelerationStructureInstanceList> instance_list = device->create_acceleration_structure_instance_list(1);
-    instance_list->write(0, AccelerationStructureInstanceDesc{
+    ref<AccelerationStructureInstanceList> instanceList = device->create_acceleration_structure_instance_list(1);
+    instanceList->write(0, AccelerationStructureInstanceDesc{
         .transform = float3x4::identity(),
         .instance_id = 0,
         .instance_mask = 0xff,
@@ -339,28 +338,28 @@ int main()
         .acceleration_structure = AccelerationStructureHandle{blasHandle},
     });
 
-    AccelerationStructureBuildDesc tlas_build_desc{
-        .inputs = {instance_list->build_input_instances()},
+    AccelerationStructureBuildDesc tlasBuildDesc{
+        .inputs = {instanceList->build_input_instances()},
     };
-    AccelerationStructureSizes tlas_sizes = device->get_acceleration_structure_sizes(tlas_build_desc);
-    ref<Buffer> tlas_scratch = device->create_buffer({
-        .size = tlas_sizes.scratch_size,
+    AccelerationStructureSizes tlasSizes = device->get_acceleration_structure_sizes(tlasBuildDesc);
+    ref<Buffer> tlasScratch = device->create_buffer({
+        .size = tlasSizes.scratch_size,
         .usage = BufferUsage::unordered_access,
         .label = "tlas_scratch",
     });
     ref<AccelerationStructure> tlas = device->create_acceleration_structure({
-        .size = tlas_sizes.acceleration_structure_size,
+        .size = tlasSizes.acceleration_structure_size,
         .label = "tlas",
     });
     {
         auto enc = device->create_command_encoder();
-        enc->build_acceleration_structure(tlas_build_desc, tlas, nullptr, tlas_scratch);
+        enc->build_acceleration_structure(tlasBuildDesc, tlas, nullptr, tlasScratch);
         device->submit_command_buffer(enc->finish());
     }
 
     // --- Output texture ---
     const uint32_t W = 512, H = 512;
-    ref<Texture> render_texture = device->create_texture({
+    ref<Texture> renderTexture = device->create_texture({
         .format = Format::rgba32_float,
         .width = W,
         .height = H,
@@ -380,7 +379,7 @@ int main()
     pdesc.max_ray_payload_size = 16;
     pdesc.flags = RayTracingPipelineFlags::enable_clusters;
     auto pipeline = device->create_ray_tracing_pipeline(pdesc);
-    auto shader_table = device->create_shader_table({
+    auto shaderTable = device->create_shader_table({
         .program = program,
         .ray_gen_entry_points = {"ray_gen"},
         .miss_entry_points = {"miss"},
@@ -391,17 +390,17 @@ int main()
     {
         auto enc = device->create_command_encoder();
         auto pass = enc->begin_ray_tracing_pass();
-        auto shader_object = pass->bind_pipeline(pipeline, shader_table);
-        ShaderCursor cursor(shader_object);
+        auto shaderObject = pass->bind_pipeline(pipeline, shaderTable);
+        ShaderCursor cursor(shaderObject);
         cursor["tlas"] = tlas;
-        cursor["render_texture"] = render_texture;
+        cursor["render_texture"] = renderTexture;
         pass->dispatch_rays(0, uint3{W, H, 1});
         pass->end();
         device->submit_command_buffer(enc->finish());
     }
 
     // --- Send to Tev ---
-    tev::show(render_texture, "raytracing_pipeline_clusters");
+    tev::show(renderTexture, "raytracing_pipeline_clusters");
 
     return 0;
 }
