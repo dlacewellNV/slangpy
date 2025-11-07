@@ -1,0 +1,105 @@
+### Step 10 — Vulkan backend (detailed plan)
+
+Goal: Implement and validate the Vulkan backend for cluster acceleration structures in slang‑rhi and SGL, then validate via our example. Proceed “inside out”: slang‑rhi → tests → SGL → example.
+
+References:
+- Headers/registry: `reference/vk-extension/` (`vulkan_core.h`, `vk.xml`)
+- Sample code: `reference/vk_animated_clusters/` (usage patterns, barriers, pipeline `pNext`)
+
+APIs used:
+- Feature/properties: `VkPhysicalDeviceClusterAccelerationStructureFeaturesNV`, `VkPhysicalDeviceClusterAccelerationStructurePropertiesNV`
+- Pipeline toggle: `VkRayTracingPipelineClusterAccelerationStructureCreateInfoNV`
+- Size query: `vkGetClusterAccelerationStructureBuildSizesNV`
+- Build command: `vkCmdBuildClusterAccelerationStructureIndirectNV`
+
+Device ABI:
+- Keep device “Args” POD ABI identical to OptiX/DX backends (u32/u64 POD only). Host Vulkan structs are backend‑specific; ABI is shared in shaders.
+
+Sub-steps (with acceptance):
+
+- [ ] 10.1 Capabilities and limits
+- Work:
+  - Query `VkPhysicalDeviceClusterAccelerationStructureFeaturesNV` and expose `"cluster-acceleration-structure"` feature when `clusterAccelerationStructure == VK_TRUE`.
+  - Query `VkPhysicalDeviceClusterAccelerationStructurePropertiesNV`; surface/validate limits: `maxVerticesPerCluster`, `maxTrianglesPerCluster`, `maxClusterGeometryIndex`, and byte alignments (scratch/output/template/bottom-level/template-bounds).
+  - Require buffer device addresses and ray tracing pipeline prerequisites.
+- Acceptance: Feature toggles correctly; limits mirrored in RHI; validation enforces formats/alignments/counts.
+
+- [ ] 10.2 Ray tracing pipeline toggle
+- Work: If clusters are enabled in the pipeline desc, insert `VkRayTracingPipelineClusterAccelerationStructureCreateInfoNV` into `pNext` with `allowClusterAccelerationStructure = VK_TRUE`.
+- Acceptance: Pipeline creation succeeds on capable devices; meaningful failure if not supported.
+
+- [ ] 10.3 Get-sizes path
+- Work:
+  - Translate RHI get‑sizes desc to `VkClusterAccelerationStructureInputInfoNV` and call `vkGetClusterAccelerationStructureBuildSizesNV`.
+  - Map results to RHI sizes by mode:
+    - IMPLICIT: total output size for all elements + total scratch.
+    - EXPLICIT: size of one element + total scratch for `maxAccelerationStructureCount`.
+    - COMPUTE_SIZES: only total scratch (device-side per‑element sizes are via indirect command path if used).
+- Acceptance: Sizes match sample expectations; errors for missing inputs/alignments.
+
+- [ ] 10.4 Device builds (CLAS/BLAS/Templates)
+- Work:
+  - Map RHI `buildType`/`buildMode` → `VkClusterAccelerationStructureOpTypeNV`/`VkClusterAccelerationStructureOpModeNV`.
+  - Fill `VkClusterAccelerationStructureInputInfoNV` (host caps) and `VkClusterAccelerationStructureCommandsInfoNV` (device addresses and arrays).
+  - Encode `vkCmdBuildClusterAccelerationStructureIndirectNV` for:
+    - CLASFromTriangles (`BUILD_TRIANGLE_CLUSTER_NV`)
+    - TemplatesFromTriangles (`BUILD_TRIANGLE_CLUSTER_TEMPLATE_NV`)
+    - CLASFromTemplates (`INSTANTIATE_TRIANGLE_CLUSTER_NV`)
+    - BLASFromCLAS (`BUILD_CLUSTERS_BOTTOM_LEVEL_NV`)
+  - MVP: `addressResolutionFlags = 0`.
+- Acceptance: Non‑zero handles and sensible sizes for CLAS/BLAS; parity with OptiX smoke tests (structural).
+
+- [ ] 10.5 Buffers and device addresses
+- Work:
+  - Inputs (triangles/templates/refs): `VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT`.
+  - Outputs (CLAS/BLAS/template buffers): `VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT`.
+  - Scratch: `VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT`.
+  - Resolve `VkDeviceAddress` for all device‑side arrays/outputs; enforce alignments from properties.
+- Acceptance: No validation errors; all addresses non‑zero; alignments correct.
+
+- [ ] 10.6 Synchronization (barrier recipes)
+- Work: Insert barriers around builds:
+  - After compute writes args → before CLAS/BLAS build
+    - srcAccess: `SHADER_WRITE`; dstAccess: `ACCELERATION_STRUCTURE_READ_KHR`
+    - srcStage: `COMPUTE_SHADER`; dstStage: `ACCELERATION_STRUCTURE_BUILD_KHR`
+  - Between CLAS → BLAS
+    - srcAccess: `ACCELERATION_STRUCTURE_WRITE_KHR|ACCELERATION_STRUCTURE_READ_KHR`; dstAccess: same
+    - srcStage: `ACCELERATION_STRUCTURE_BUILD_KHR`; dstStage: `ACCELERATION_STRUCTURE_BUILD_KHR`
+  - After BLAS/transfer → before compute reads
+    - srcAccess: `ACCELERATION_STRUCTURE_WRITE_KHR|ACCELERATION_STRUCTURE_READ_KHR|TRANSFER_WRITE`; dstAccess: `SHADER_READ`
+    - srcStage: `ACCELERATION_STRUCTURE_BUILD_KHR|TRANSFER`; dstStage: `COMPUTE_SHADER`
+  - Before ray tracing
+    - srcAccess: `ACCELERATION_STRUCTURE_WRITE_KHR|ACCELERATION_STRUCTURE_READ_KHR`; dstAccess: `ACCELERATION_STRUCTURE_READ_KHR`
+    - srcStage: `ACCELERATION_STRUCTURE_BUILD_KHR`; dstStage: `RAY_TRACING_SHADER_KHR`
+- Acceptance: Stable builds across frames; no hazards flagged.
+
+- [ ] 10.7 RHI validation and error semantics
+- Work: Enforce per‑mode required buffers, sizes/strides/formats; OMM fields must be zero; return NotAvailable when features/extension absent; NotImplemented for unsupported ops/modes.
+- Acceptance: Clear, actionable validation errors; consistent behavior across backends.
+
+- [ ] 10.8 slang‑rhi tests on Vulkan
+- Work: Enable existing cluster tests (build‑and‑shoot, device‑args variant, template instancing) on Vulkan; skip if feature absent; ensure shared shader include path works.
+- Acceptance: Tests pass on Vulkan‑capable setups; skipped elsewhere.
+
+- [ ] 10.9 SGL wiring (Vulkan)
+- Work: Mirror enums/structs and pipeline flag; route `build_cluster_acceleration` to Vulkan backend; keep shared device ABI; feature‑gate public API on capability.
+- Acceptance: SGL compiles; issues Vulkan builds under feature gate; matches test/example behavior.
+
+- [ ] 10.10 Example validation (`examples/raytracing_pipeline_clusters`)
+- Work: Run with Vulkan backend; expect non‑zero CLAS/BLAS handles, reasonable sizes, and two horizontal hit bands in the rendered image.
+- Acceptance: Sample renders correctly via Vulkan path.
+
+- [ ] 10.11 Loader integration
+- Work: Resolve `vkGetClusterAccelerationStructureBuildSizesNV` and `vkCmdBuildClusterAccelerationStructureIndirectNV` via the Vulkan loader; robust errors when unavailable.
+- Acceptance: Functions resolve on capable drivers; graceful NotAvailable otherwise.
+
+- [ ] 10.12 Debug layer parity
+- Work: Mirror RHI validation; return NotAvailable/NotImplemented where appropriate; do not simulate work.
+- Acceptance: Debug layer consistent across backends.
+
+Notes and guidance:
+- AddressResolutionFlags: keep zero in MVP.
+- Prefer IMPLICIT builds unless memory fragmentation/size constraints require EXPLICIT; use COMPUTE_SIZES selectively (e.g., templates) as in `vk_animated_clusters`.
+- Queue: use a compute‑capable queue for build commands.
+
+
