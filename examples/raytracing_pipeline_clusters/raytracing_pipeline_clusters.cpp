@@ -10,17 +10,13 @@
 #include "sgl/device/shader_object.h"
 #include "sgl/utils/tev.h"
 
-#include <slang-rhi/cluster_accel_abi_host.h>
+#include <slang-rhi/cluster_accel_args_host.h>
 
 #include <filesystem>
 
 static const std::filesystem::path EXAMPLE_DIR(SGL_EXAMPLE_DIR);
 
 using namespace sgl;
-
-#ifndef SLANG_RHI_SHADERS_DIR
-#error "SLANG_RHI_SHADERS_DIR not defined. Ensure CMake exports it from slang-rhi."
-#endif
 
 // This example demonstrates cluster acceleration structures:
 //
@@ -40,11 +36,11 @@ int main()
 {
     sgl::static_init();
 
-    const std::filesystem::path SHARED_SHADERS_DIR(SLANG_RHI_SHADERS_DIR);
+    const std::filesystem::path RHI_INCLUDE_DIR(SLANG_RHI_INCLUDE_DIR);
     ref<Device> device = Device::create({
         .type = DeviceType::cuda,
         .enable_debug_layers = true,
-        .compiler_options = {.include_paths = {EXAMPLE_DIR, SHARED_SHADERS_DIR}},
+        .compiler_options = {.include_paths = {EXAMPLE_DIR, RHI_INCLUDE_DIR}},
     });
 
     if (!device->has_feature(Feature::ray_tracing)) {
