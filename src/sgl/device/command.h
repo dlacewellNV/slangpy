@@ -354,11 +354,7 @@ public:
     void deserialize_acceleration_structure(AccelerationStructure* dst, BufferOffsetPair src);
 
     // Build a cluster acceleration structure.
-    void build_cluster_acceleration_structure(
-        const ClusterAccelBuildDesc& desc,
-        BufferOffsetPair scratch_buffer,
-        BufferOffsetPair result_buffer
-    );
+    void build_cluster_acceleration_structure(const ClusterAccelBuildDesc& desc);
     void convert_coop_vec_matrices(
         Buffer* dst,
         std::span<const CoopVecMatrixDesc> dst_descs,
