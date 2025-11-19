@@ -10,7 +10,7 @@
 #include "sgl/device/shader_object.h"
 #include "sgl/utils/tev.h"
 
-#include <slang-rhi/cluster_accel_args_host.h>
+#include <slang-rhi/cluster_accel_args.h>
 
 #include <filesystem>
 

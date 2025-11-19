@@ -60,14 +60,6 @@
      - Build‑and‑shoot: two clusters (shared indices, per‑cluster vertex base), BLASFromCLAS with 2 handles, TLAS, clusters pipeline flag; raygen writes barycentrics; assert CLAS/BLAS non‑zero and two horizontal hit bands.
      - Device‑args variant: write `TrianglesArgs` on device, insert global barrier, then build CLAS; verify parity with host‑filled args.
    - Optional: record `GetClusterID` at a known pixel.
-- [X] Step 7.5: Centralize cluster ABI headers (tests + SGL)
- - Acceptance: shared device ABI + host mirror live in common paths; tests and SGL include from shared; build search paths updated.
- - Actions: move `cluster_accel_abi.common.inc`/`cluster_accel_abi.slang` to `external/slang-rhi/shaders/cluster_accel/`; add host mirror to `external/slang-rhi/include/slang-rhi/cluster_accel_abi_host.h`; add shared shader dir to tests/SGL include paths; replace local includes.
- - [X] Step 7.55: Export shader include dir via CMake (usable by SGL)
-  - Acceptance: CMake exports `SLANG_RHI_SHADERS_DIR` (or interface include dir) and SGL example/test consume it; no hardcoded relative paths in code.
-  - Actions: add an interface definition/include path in slang-rhi CMake; pass `SLANG_RHI_SHADERS_DIR` to tests/SGL; update SGL example to drop runtime path injection.
- - [X] Step 7.6: Cleanup and document cluster ABI bit packing.  Try not to expose global constants (namespace them if nothing else).  Try to explain magic numbers.
-  - Acceptance: `cluster_accel_abi.common.inc` has clarified masks/shifts (brief comments or helper enums) and consistent naming; no functional changes.
 - [X] Step 8.0: refactor per-op limits to a discriminated union keyed by op (mirror OptiX/Vulkan/NVAPI patterns) if not already done in an earlier step
   - Acceptance: slang-rhi and SGL still build, examples and tests work
   - Also check which limits are required in which build types.  Search for comments incorrectly stating that they're optional.
@@ -86,7 +78,10 @@
 - [ ] Step 10: Vulkan backend
   - Acceptance: slang-rhi, SGL, and our cluster tests and SGL sample all build and run successfully using Vulkan backend rather than cuda
   - Details: see `reference/cluster-accel-plan-vulkan-details.txt` for sub-steps, API mapping, synchronization, and validation plan
-- [ ] Step 11: Optionally, design an interactive sample similar to the "pathtracer" sample, based on the structured cluster sample in the directory "reference/optix-cluster-example-structured/"
+
+- [ ] Step 11: DX backend to be discussed
+
+- [ ] Optionally, design an interactive sample similar to the "pathtracer" sample, based on the structured cluster sample in the directory "reference/optix-cluster-example-structured/"
   - Acceptance: sample builds and runs and looks good (confirmed by me)
   - Result should be a procedurally animated surface - a heightfield made of many small clusters
   - Sample will need to be simplified vs the OptiX sample
